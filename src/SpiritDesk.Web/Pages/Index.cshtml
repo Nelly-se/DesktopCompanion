@@ -1,0 +1,273 @@
+@page
+@using SpiritDesk.Web.Helpers
+@model IndexModel
+@{
+    ViewData["Title"] = "SpiritDesk";
+    var profile = Model.Desk.Profile;
+    var spirit = Model.Desk.CurrentSpirit;
+    var messages = Model.Desk.ChatMessages;
+    var counts = Model.Desk.DailyCounts;
+    var pendingTasks = Model.Desk.TaskSnapshot.PendingTasks;
+    var completedTasks = Model.Desk.TaskSnapshot.CompletedTasks;
+    var greetingPrefix = DateTimeHelper.GetGreetingByHour(DateTime.Now);
+    var gameMax = 5 + spirit.GameCountBonus;
+}
+
+<div class="workbench-app" style="--spirit-accent:@spirit.AccentColor">
+    <aside class="sidebar">
+        <div class="brand-block">
+            <div class="brand-avatar">光</div>
+            <div>
+                <h2>光合桌面</h2>
+                <p>SpiritDesk Companion</p>
+            </div>
+        </div>
+
+        <nav class="nav-menu">
+            <a class="nav-item active" href="#">首页</a>
+            <a class="nav-item" href="#">助手</a>
+            <a class="nav-item" href="#">回顾</a>
+            <a class="nav-item" href="#">任务</a>
+        </nav>
+
+        <section class="sidebar-section">
+            <div class="sidebar-title-row">
+                <span>会话</span>
+                <span class="tiny-badge">16</span>
+            </div>
+            <div class="sidebar-card muted-card">
+                暂无活动会话
+            </div>
+        </section>
+
+        <section class="sidebar-section spirit-pool">
+            <div class="sidebar-title-row">
+                <span>精灵球</span>
+                <span class="tiny-badge">@Model.Desk.Spirits.Count</span>
+            </div>
+            <div class="mini-dock">
+                @foreach (var item in Model.Desk.Spirits)
+                {
+                    <form method="post" asp-page-handler="SelectSpirit">
+                        <input type="hidden" asp-for="SpiritId" value="@item.Id" />
+                        <button type="submit" class="mini-ball @(item.Id == spirit.Id ? "active" : "")" style="--ball-accent:@item.AccentColor" title="@item.Name">
+                            <img src="@item.ImagePath" alt="@item.Name" />
+                        </button>
+                    </form>
+                }
+            </div>
+        </section>
+    </aside>
+
+    <main class="main-workbench">
+        <section class="hero-head">
+            <div>
+                <h1>@greetingPrefix，@profile.Nickname</h1>
+                <p>当前陪伴精灵是 <strong>@spirit.Name</strong>，以下为今天的重点安排与陪伴提示。</p>
+            </div>
+            <div class="hero-toolbar">
+                <button class="toolbar-pill active">事件</button>
+                <button class="toolbar-pill">15 分钟</button>
+                <button class="toolbar-pill">30 分钟</button>
+                <button class="toolbar-pill">1 小时</button>
+                <div class="toolbar-date">@DateTime.Now.ToString("M月d日")</div>
+            </div>
+        </section>
+
+        <section class="content-grid">
+            <div class="left-content">
+                <section class="content-card daily-card">
+                    <div class="card-head">
+                        <div>
+                            <span class="card-kicker">今日卡片</span>
+                            <h3>@DateTime.Now.ToString("M月d日 dddd")</h3>
+                        </div>
+                        <span class="beta-badge">BETA</span>
+                    </div>
+
+                    <div class="daily-callout">
+                        <p>@Model.Desk.HelperTip</p>
+                    </div>
+
+                    <div class="daily-text">
+                        <p>@Model.Desk.WelcomeBackMessage</p>
+                        <p>@Model.Desk.Greeting</p>
+                    </div>
+
+                    <form method="post" asp-page-handler="AddTask" class="inline-task-form">
+                        <input asp-for="NewTaskTitle" class="soft-input" placeholder="输入新任务标题" />
+                        <textarea asp-for="NewTaskDescription" class="soft-input" rows="3" placeholder="补充任务说明"></textarea>
+                        <input asp-for="NewTaskDueAt" class="soft-input" type="datetime-local" />
+                        <button type="submit" class="action-button green">添加新任务</button>
+                    </form>
+
+                    <form method="post" asp-page-handler="SendMessage" class="inline-task-form compact-top">
+                        <textarea asp-for="MessageText" class="soft-input" rows="3" placeholder="向 @spirit.Name 发送一句话，例如：帮我安排今天的工作。"></textarea>
+                        <button type="submit" class="action-button purple">发送给 @spirit.Name</button>
+                    </form>
+                </section>
+            </div>
+
+            <div class="center-content">
+                <section class="content-card calendar-card">
+                    <div class="calendar-head">
+                        <div class="calendar-tabs">
+                            <button class="tab-pill active">已确认任务</button>
+                            <button class="tab-pill">待处理任务</button>
+                        </div>
+                        <h3>@DateTime.Now.ToString("yyyy 年 M 月")</h3>
+                        <div class="calendar-view-switch">
+                            <button class="toolbar-pill">周视图</button>
+                            <button class="toolbar-pill active">月视图</button>
+                        </div>
+                    </div>
+
+                    <div class="calendar-grid">
+                        @foreach (var weekday in new[] { "日", "一", "二", "三", "四", "五", "六" })
+                        {
+                            <div class="calendar-weekday">@weekday</div>
+                        }
+
+                        @for (var i = 1; i <= 31; i++)
+                        {
+                            var isToday = i == DateTime.Now.Day;
+                            <div class="calendar-day @(isToday ? "today" : "")">@i</div>
+                        }
+                    </div>
+                </section>
+
+                <section class="content-card task-columns">
+                    <div class="column-card">
+                        <div class="card-head">
+                            <h3>待办任务</h3>
+                            <span class="tiny-badge">@Model.Desk.TaskSnapshot.PendingCount</span>
+                        </div>
+                        <div class="stack-list">
+                            @foreach (var task in pendingTasks)
+                            {
+                                <div class="stack-item">
+                                    <div>
+                                        <strong>@task.Title</strong>
+                                        <p>@(task.Description ?? "暂无补充说明")</p>
+                                    </div>
+                                    <form method="post" asp-page-handler="CompleteTask">
+                                        <input type="hidden" asp-for="TaskId" value="@task.Id" />
+                                        <button type="submit" class="small-action">完成</button>
+                                    </form>
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="column-card">
+                        <div class="card-head">
+                            <h3>最近对话</h3>
+                            <span class="tiny-badge">@messages.Count</span>
+                        </div>
+                        <div class="message-stack">
+                            @foreach (var message in messages.TakeLast(5))
+                            {
+                                <div class="message-row @(message.Sender == "user" ? "user" : "spirit")">
+                                    <strong>@(message.Sender == "user" ? profile.Nickname : spirit.Name)</strong>
+                                    <p>@message.Content</p>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <aside class="right-content">
+                <section class="assistant-card">
+                    <div class="assistant-top">
+                        <div>
+                            <h3>@spirit.Name</h3>
+                            <p>@spirit.Title</p>
+                        </div>
+                        <div class="toggle-stack">
+                            <div class="fake-toggle on"></div>
+                            <div class="fake-toggle"></div>
+                        </div>
+                    </div>
+
+                    <div class="spirit-stage-compact">
+                        <div class="compact-orb">
+                            <img src="@spirit.ImagePath" alt="@spirit.Name" />
+                        </div>
+                    </div>
+
+                    <div class="assistant-stats">
+                        <div>
+                            <strong>今日 @((counts.TryGetValue("checkin", out var todayCheckin) ? todayCheckin : 0))</strong>
+                            <span>签到</span>
+                        </div>
+                        <div>
+                            <strong>总计 @profile.Affinity</strong>
+                            <span>亲密度</span>
+                        </div>
+                    </div>
+
+                    <button class="wide-ghost">@spirit.Mbti · @spirit.CoreRole</button>
+                    <p class="assistant-foot">@spirit.SpecialMechanism</p>
+                </section>
+
+                <section class="helper-card">
+                    <div class="card-head">
+                        <h3>主动助手</h3>
+                    </div>
+
+                    <div class="reminder-box">
+                        <strong>发展提醒</strong>
+                        <p>@Model.Desk.HelperTip</p>
+                        <div class="pill-row">
+                            <button class="mini-pill">2 分钟</button>
+                            <button class="mini-pill active">3 分钟</button>
+                            <button class="mini-pill">5 分钟</button>
+                            <button class="mini-pill">10 分钟</button>
+                        </div>
+                    </div>
+
+                    <div class="action-group">
+                        <form method="post" asp-page-handler="Interact">
+                            <input type="hidden" asp-for="ActionType" value="checkin" />
+                            <button type="submit" class="action-button white">每日签到</button>
+                        </form>
+                        <form method="post" asp-page-handler="Interact">
+                            <input type="hidden" asp-for="ActionType" value="feed" />
+                            <button type="submit" class="action-button white">投喂精灵</button>
+                        </form>
+                        <form method="post" asp-page-handler="Interact">
+                            <input type="hidden" asp-for="ActionType" value="study" />
+                            <button type="submit" class="action-button white">陪我学习</button>
+                        </form>
+                        <form method="post" asp-page-handler="Interact">
+                            <input type="hidden" asp-for="ActionType" value="rest" />
+                            <button type="submit" class="action-button white">提醒休息</button>
+                        </form>
+                    </div>
+                </section>
+
+                <section class="helper-card">
+                    <div class="card-head">
+                        <h3>小游戏</h3>
+                        <span class="tiny-badge">@((counts.TryGetValue("game", out var gameCount) ? gameCount : 0)) / @gameMax</span>
+                    </div>
+                    <div class="game-grid">
+                        <form method="post" asp-page-handler="PlayGame">
+                            <input type="hidden" asp-for="GameChoice" value="rock" />
+                            <button type="submit" class="action-button amber">石头</button>
+                        </form>
+                        <form method="post" asp-page-handler="PlayGame">
+                            <input type="hidden" asp-for="GameChoice" value="paper" />
+                            <button type="submit" class="action-button amber">布</button>
+                        </form>
+                        <form method="post" asp-page-handler="PlayGame">
+                            <input type="hidden" asp-for="GameChoice" value="scissors" />
+                            <button type="submit" class="action-button amber">剪刀</button>
+                        </form>
+                    </div>
+                </section>
+            </aside>
+        </section>
+    </main>
+</div>

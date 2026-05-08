@@ -1,0 +1,50 @@
+@page
+@model SpiritDesk.Web.Pages.Spirits.SelectModel
+@{
+    ViewData["Title"] = "选择精灵";
+}
+
+<div class="select-shell">
+    <div class="select-header">
+        <div>
+            <p class="eyebrow">Spirit Selection</p>
+            <h1>请选择你的初始精灵伴侣</h1>
+            <p class="select-copy">五位精灵各自代表不同的陪伴风格。首次选择后将作为你的主要陪伴对象，后续更换建议设置限制条件。</p>
+        </div>
+    </div>
+
+    <div class="select-grid">
+        @foreach (var spirit in Model.Spirits)
+        {
+            <form method="post" class="spirit-select-card" style="--spirit-accent:@spirit.AccentColor">
+                <input type="hidden" asp-for="SpiritId" value="@spirit.Id" />
+                <div class="spirit-select-top">
+                    <div>
+                        <span class="spirit-tag">@spirit.Mbti</span>
+                        <h2>@spirit.Name</h2>
+                        <p class="select-title">@spirit.Title</p>
+                    </div>
+                    <img src="@spirit.ImagePath" alt="@spirit.Name" class="select-spirit-image" />
+                </div>
+
+                <div class="select-detail">
+                    <div class="detail-row">
+                        <span>核心定位</span>
+                        <strong>@spirit.CoreRole</strong>
+                    </div>
+                    <p>@spirit.Description</p>
+                    <div class="example-box">
+                        <span>对话风格示例</span>
+                        <p>@spirit.DialogueExample</p>
+                    </div>
+                    <div class="mechanism-box">
+                        <span>特殊激励机制</span>
+                        <p>@spirit.SpecialMechanism</p>
+                    </div>
+                </div>
+
+                <button type="submit" class="primary-button choose-button">选择 @spirit.Name</button>
+            </form>
+        }
+    </div>
+</div>
