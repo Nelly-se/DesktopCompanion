@@ -1,4 +1,4 @@
-<Window x:Class="SpiritDesk.Shell.MainWindow"
+﻿<Window x:Class="SpiritDesk.Shell.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
@@ -11,7 +11,7 @@
         MinWidth="1180"
         MinHeight="760"
         WindowStartupLocation="CenterScreen"
-        Background="#F2F8FA">
+        Background="#EDF5EF">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -19,23 +19,21 @@
         </Grid.RowDefinitions>
 
         <Border Padding="16"
-                Background="#F6FBFD"
-                BorderBrush="#D7E6EB"
+                Background="#F7FBF8"
+                BorderBrush="#D5E8DF"
                 BorderThickness="0,0,0,1">
             <DockPanel>
                 <StackPanel Orientation="Vertical" DockPanel.Dock="Left">
                     <TextBlock FontSize="24"
                                FontWeight="SemiBold"
-                               Foreground="#19343C"
+                               Foreground="#1A2E26"
                                Text="SpiritDesk" />
-                    <TextBlock Margin="0,4,0,0"
-                               Foreground="#66808A"
-                               Text="WPF 桌面壳 + WebView2 + ASP.NET Core" />
+                    
                 </StackPanel>
                 <TextBlock x:Name="StatusText"
                            DockPanel.Dock="Right"
                            VerticalAlignment="Center"
-                           Foreground="#66808A"
+                           Foreground="#5C726A"
                            Text="正在启动本地桌面服务..." />
             </DockPanel>
         </Border>
@@ -44,7 +42,7 @@
                 Margin="14"
                 CornerRadius="24"
                 Background="White"
-                BorderBrush="#DCE8EC"
+                BorderBrush="#D8EBE3"
                 BorderThickness="1">
             <wv2:WebView2 x:Name="Browser" />
         </Border>

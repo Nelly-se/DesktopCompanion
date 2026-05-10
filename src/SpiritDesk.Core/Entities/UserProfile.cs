@@ -9,6 +9,7 @@ public class UserProfile
     public int Affinity { get; set; } = 0;
     public int Level { get; set; } = 1;
     public int Coins { get; set; } = 20;
+    public DateTime? LastSpiritSwitchAt { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.Now;
     public DateTime UpdatedAt { get; set; } = DateTime.Now;
 }

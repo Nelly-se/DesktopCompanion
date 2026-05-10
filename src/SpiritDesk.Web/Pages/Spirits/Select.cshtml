@@ -1,50 +1,79 @@
-@page
+﻿@page
 @model SpiritDesk.Web.Pages.Spirits.SelectModel
 @{
     ViewData["Title"] = "选择精灵";
 }
 
-<div class="select-shell">
-    <div class="select-header">
-        <div>
-            <p class="eyebrow">Spirit Selection</p>
-            <h1>请选择你的初始精灵伴侣</h1>
-            <p class="select-copy">五位精灵各自代表不同的陪伴风格。首次选择后将作为你的主要陪伴对象，后续更换建议设置限制条件。</p>
+<div class="select-shell balance-onboarding">
+    <header class="balance-hero">
+        <p class="balance-kicker">SpiritDesk · 光合桌面</p>
+        <h1 class="balance-headline">选一位伙伴，开始桌面陪伴</h1>
+        <p class="balance-lead">数据保存在本机。起一个昵称，再在下方选择与你合拍的那位精灵。</p>
+        <div class="balance-meta-row" aria-label="引导要点">
+            <span class="balance-chip">本地优先</span>
+            <span class="balance-chip">约一分钟完成</span>
+            <span class="balance-chip">精灵可随时更换</span>
         </div>
-    </div>
+    </header>
 
-    <div class="select-grid">
-        @foreach (var spirit in Model.Spirits)
-        {
-            <form method="post" class="spirit-select-card" style="--spirit-accent:@spirit.AccentColor">
-                <input type="hidden" asp-for="SpiritId" value="@spirit.Id" />
-                <div class="spirit-select-top">
-                    <div>
-                        <span class="spirit-tag">@spirit.Mbti</span>
-                        <h2>@spirit.Name</h2>
-                        <p class="select-title">@spirit.Title</p>
-                    </div>
-                    <img src="@spirit.ImagePath" alt="@spirit.Name" class="select-spirit-image" />
+    <form method="post" class="balance-form-block">
+        <section class="balance-profile-panel" aria-labelledby="balance-profile-heading">
+            <h2 id="balance-profile-heading" class="balance-profile-heading">
+                你的昵称
+            </h2>
+            <p class="balance-profile-lead">会出现在主页与聊天记录里；绑定后仍可在设置里修改。</p>
+
+            <div class="select-profile-form">
+                <label asp-for="Nickname" class="balance-label">昵称</label>
+                <input asp-for="Nickname" class="soft-input" placeholder="例如：小陈、林间鹿、代号周五" maxlength="24" />
+                @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+                {
+                    <p class="form-error">@Model.ErrorMessage</p>
+                }
+                <div class="profile-hint-list">
+                    <span>建议 2–12 个字，读起来顺口即可。</span>
+                    <span>点击下方卡片底部的按钮即创建档案并进入主页。</span>
                 </div>
+            </div>
+        </section>
 
-                <div class="select-detail">
-                    <div class="detail-row">
-                        <span>核心定位</span>
-                        <strong>@spirit.CoreRole</strong>
+        <div class="balance-section-head">
+            <h2 class="balance-section-title">五位精灵 · 选一位开始</h2>
+            <p class="balance-section-lead">每位都有不同的语气与小特长，可在卡片里查看示例对话与激励方式。</p>
+        </div>
+
+        <div class="select-grid">
+            @foreach (var spirit in Model.Spirits)
+            {
+                <div class="spirit-select-card" style="--spirit-accent:@spirit.AccentColor">
+                    <div class="spirit-select-top">
+                        <div>
+                            <span class="spirit-tag">@spirit.Mbti</span>
+                            <h2>@spirit.Name</h2>
+                            <p class="select-title">@spirit.Title</p>
+                        </div>
+                        <img src="@spirit.ImagePath" alt="@spirit.Name" class="select-spirit-image" />
                     </div>
-                    <p>@spirit.Description</p>
-                    <div class="example-box">
-                        <span>对话风格示例</span>
-                        <p>@spirit.DialogueExample</p>
+
+                    <div class="select-detail">
+                        <div class="detail-row">
+                            <span>核心定位</span>
+                            <strong>@spirit.CoreRole</strong>
+                        </div>
+                        <p>@spirit.Description</p>
+                        <div class="example-box">
+                            <span>对话风格示例</span>
+                            <p>@spirit.DialogueExample</p>
+                        </div>
+                        <div class="mechanism-box">
+                            <span>特殊激励机制</span>
+                            <p>@spirit.SpecialMechanism</p>
+                        </div>
                     </div>
-                    <div class="mechanism-box">
-                        <span>特殊激励机制</span>
-                        <p>@spirit.SpecialMechanism</p>
-                    </div>
+
+                    <button type="submit" class="primary-button choose-button" name="SpiritId" value="@spirit.Id">创建档案并选择 @spirit.Name</button>
                 </div>
-
-                <button type="submit" class="primary-button choose-button">选择 @spirit.Name</button>
-            </form>
-        }
-    </div>
+            }
+        </div>
+    </form>
 </div>

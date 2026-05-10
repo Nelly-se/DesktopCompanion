@@ -16,6 +16,7 @@ public static class DatabaseBootstrapper
                 "Affinity",
                 "Level",
                 "Coins",
+                "LastSpiritSwitchAt",
                 "CreatedAt",
                 "UpdatedAt"
             ],
@@ -127,8 +128,8 @@ public static class DatabaseBootstrapper
                 directory,
                 $"spiritdesk.backup-{DateTime.Now:yyyyMMdd-HHmmss}.db");
 
-            DeleteIfExists($"{databasePath}-shm");
-            DeleteIfExists($"{databasePath}-wal");
+            SafeDelete($"{databasePath}-shm");
+            SafeDelete($"{databasePath}-wal");
 
             if (File.Exists(databasePath))
             {
@@ -140,8 +141,8 @@ public static class DatabaseBootstrapper
         catch (IOException)
         {
             SafeDelete(databasePath);
-            DeleteIfExists($"{databasePath}-shm");
-            DeleteIfExists($"{databasePath}-wal");
+            SafeDelete($"{databasePath}-shm");
+            SafeDelete($"{databasePath}-wal");
         }
     }
 
@@ -159,7 +160,10 @@ public static class DatabaseBootstrapper
         {
             DeleteIfExists(path);
         }
-        catch
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
         {
         }
     }

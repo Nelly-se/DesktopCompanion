@@ -1,0 +1,70 @@
+@using SpiritDesk.Web.Helpers
+@{
+    var companionName = ViewData["FloatingCompanionName"] as string;
+    var companionImage = ViewData["FloatingCompanionImage"] as string;
+    var companionAccent = ViewData["FloatingCompanionAccent"] as string ?? "#4a9d72";
+    var companionTitle = ViewData["FloatingCompanionTitle"] as string;
+    var companionGreeting = ViewData["FloatingCompanionGreeting"] as string;
+    var companionMood = ViewData["FloatingCompanionMood"] as int? ?? 0;
+    var companionLevel = ViewData["FloatingCompanionLevel"] as int? ?? 0;
+    var hasCompanion = !string.IsNullOrWhiteSpace(companionName) && !string.IsNullOrWhiteSpace(companionImage);
+}
+
+@if (hasCompanion)
+{
+    <div class="floating-companion" data-floating-companion style="--floating-accent:@companionAccent">
+        <button type="button" class="floating-companion-toggle" data-floating-toggle aria-expanded="false" title="展开桌面伴侣">
+            <span class="floating-companion-aura"></span>
+            <img src="@companionImage" alt="@companionName" class="floating-companion-avatar" />
+            <span class="floating-companion-ping"></span>
+        </button>
+
+        <section class="floating-companion-panel" data-floating-panel aria-hidden="true">
+            <div class="floating-companion-head">
+                <div>
+                    <span class="floating-companion-kicker">桌面伴侣</span>
+                    <h3>@companionName</h3>
+                    @if (!string.IsNullOrWhiteSpace(companionTitle))
+                    {
+                        <p>@companionTitle</p>
+                    }
+                </div>
+                <button type="button" class="floating-companion-close" data-floating-close aria-label="收起桌面伴侣">×</button>
+            </div>
+
+            <div class="floating-companion-body">
+                <div class="floating-companion-stage">
+                    <div class="floating-companion-orb">
+                        <img src="@companionImage" alt="@companionName" />
+                    </div>
+                </div>
+
+                @if (!string.IsNullOrWhiteSpace(companionGreeting))
+                {
+                    <p class="floating-companion-bubble">@companionGreeting</p>
+                }
+
+                <div class="floating-companion-stats">
+                    <div>
+                        <strong>@companionMood</strong>
+                        <span>心情值</span>
+                    </div>
+                    <div>
+                        <strong>@companionLevel</strong>
+                        <span>等级</span>
+                    </div>
+                    <div>
+                        <strong>@DateTimeHelper.GetGreetingByHour(DateTime.Now)</strong>
+                        <span>陪伴状态</span>
+                    </div>
+                </div>
+
+                <div class="floating-companion-actions">
+                    <a asp-page="/Index" class="floating-action">主页</a>
+                    <a asp-page="/Chat" class="floating-action">聊天</a>
+                    <a asp-page="/Assistant" class="floating-action">互动</a>
+                </div>
+            </div>
+        </section>
+    </div>
+}

@@ -2,7 +2,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SpiritDesk.Core\SpiritDesk.Core.csproj" />
-    <ProjectReference Include="..\SpiritDesk.Web\SpiritDesk.Web.csproj" />
   </ItemGroup>
 
   <ItemGroup>

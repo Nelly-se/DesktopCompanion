@@ -14,4 +14,5 @@ public class SpiritDeskViewModel
     public required string Greeting { get; init; }
     public required string WelcomeBackMessage { get; init; }
     public required string HelperTip { get; init; }
+    public string? ReturnNotice { get; init; }
 }

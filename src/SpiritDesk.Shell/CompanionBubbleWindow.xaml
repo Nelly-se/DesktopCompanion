@@ -1,0 +1,32 @@
+<Window x:Class="SpiritDesk.Shell.CompanionBubbleWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="SpiritDeskBubble"
+        Width="96"
+        Height="96"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ResizeMode="NoResize"
+        Topmost="True"
+        ShowInTaskbar="False"
+        ShowActivated="False"
+        MouseDoubleClick="Bubble_MouseDoubleClick">
+    <Grid MouseLeftButtonDown="Bubble_MouseLeftButtonDown"
+          MouseLeftButtonUp="Bubble_MouseLeftButtonUp"
+          MouseMove="Bubble_MouseMove"
+          MouseRightButtonUp="Bubble_MouseRightButtonUp">
+        <Image x:Name="SpiritImage"
+               Margin="4"
+               Stretch="Uniform"
+               RenderOptions.BitmapScalingMode="HighQuality"
+               SnapsToDevicePixels="True">
+            <Image.Effect>
+                <DropShadowEffect BlurRadius="18"
+                                  ShadowDepth="2"
+                                  Opacity="0.38"
+                                  Direction="270" />
+            </Image.Effect>
+        </Image>
+    </Grid>
+</Window>

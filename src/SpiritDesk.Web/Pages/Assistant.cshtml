@@ -1,0 +1,133 @@
+@page
+@model AssistantModel
+@{
+    ViewData["Title"] = "助手";
+    var profile = Model.Desk.Profile;
+    var spirit = Model.Desk.CurrentSpirit;
+    var counts = Model.Desk.DailyCounts;
+}
+
+<div class="workbench-app" data-workbench-root style="--spirit-accent:@spirit.AccentColor">
+    <aside class="sidebar">
+        <partial name="Shared/_SidebarCollapseToggle" />
+        <div class="sidebar-body">
+            <div class="sidebar-brand-row brand-compact">
+                <div class="brand-avatar">灵</div>
+                <div class="brand-text">
+                    <h2>光合桌面</h2>
+                    <p>SpiritDesk</p>
+                </div>
+            </div>
+
+            <nav class="nav-menu">
+                <a class="nav-item" asp-page="/Index"><span class="nav-label">首页</span></a>
+                <a class="nav-item active" asp-page="/Assistant"><span class="nav-label">助手</span></a>
+                <a class="nav-item" asp-page="/Chat"><span class="nav-label">回顾</span></a>
+                <a class="nav-item" asp-page="/Settings"><span class="nav-label">设置</span></a>
+            </nav>
+
+            <section class="sidebar-section spirit-pool">
+                <div class="sidebar-title-row">
+                    <span>精灵球</span>
+                    <span class="tiny-badge">@Model.Desk.Spirits.Count</span>
+                </div>
+                <div class="mini-dock-wrap">
+                    <div class="mini-dock">
+                        @foreach (var item in Model.Desk.Spirits)
+                        {
+                            <form method="post" asp-page-handler="SelectSpirit" class="mini-dock-form">
+                                <input type="hidden" asp-for="SpiritId" value="@item.Id" />
+                                <button type="submit" class="mini-ball @(item.Id == spirit.Id ? "active" : "")" style="--ball-accent:@item.AccentColor" title="@item.Name">
+                                    <img src="@item.ImagePath" alt="@item.Name" />
+                                </button>
+                            </form>
+                        }
+                    </div>
+                </div>
+            </section>
+        </div>
+    </aside>
+
+    <main class="main-workbench">
+        <section class="hero-head">
+            <div>
+                <h1>主动助手</h1>
+                <p>集中完成签到、投喂与节奏陪伴；主页负责任务与聊天，这里负责状态维护与日常互动。</p>
+            </div>
+            <div class="hero-toolbar">
+                <a class="toolbar-pill" asp-page="/Index">返回主页</a>
+            </div>
+        </section>
+
+        @if (!string.IsNullOrWhiteSpace(Model.NoticeMessage))
+        {
+            <div class="notice-banner">@Model.NoticeMessage</div>
+        }
+
+        <section class="assistant-page-grid">
+            <section class="assistant-card assistant-page-stage">
+                <div class="assistant-top">
+                    <div>
+                        <h3>@spirit.Name</h3>
+                        <p>@spirit.Title</p>
+                    </div>
+                </div>
+
+                <div class="spirit-stage-compact">
+                    <div class="compact-orb">
+                        <img src="@spirit.ImagePath" alt="@spirit.Name" />
+                    </div>
+                </div>
+
+                <div class="assistant-stats">
+                    <div>
+                        <strong>今日 @(counts.TryGetValue("checkin", out var todayCheckin) ? todayCheckin : 0)</strong>
+                        <span>签到</span>
+                    </div>
+                    <div>
+                        <strong>累计 @profile.Affinity</strong>
+                        <span>亲密度</span>
+                    </div>
+                    <div>
+                        <strong>@profile.Coins</strong>
+                        <span>金币</span>
+                    </div>
+                </div>
+
+                <button class="wide-ghost">@spirit.Mbti · @spirit.CoreRole</button>
+                <p class="assistant-foot">@spirit.SpecialMechanism</p>
+                <p class="assistant-foot">@spirit.Description</p>
+            </section>
+
+            <section class="helper-card">
+                <div class="card-head">
+                    <h3>快捷互动</h3>
+                </div>
+                <div class="action-group">
+                    <form method="post" asp-page-handler="Interact">
+                        <input type="hidden" asp-for="ActionType" value="checkin" />
+                        <button type="submit" class="action-button white">每日签到</button>
+                    </form>
+                    <form method="post" asp-page-handler="Interact">
+                        <input type="hidden" asp-for="ActionType" value="feed" />
+                        <button type="submit" class="action-button white">投喂精灵</button>
+                    </form>
+                    <form method="post" asp-page-handler="Interact">
+                        <input type="hidden" asp-for="ActionType" value="study" />
+                        <button type="submit" class="action-button white">陪我学习</button>
+                    </form>
+                    <form method="post" asp-page-handler="Interact">
+                        <input type="hidden" asp-for="ActionType" value="rest" />
+                        <button type="submit" class="action-button white">提醒休息</button>
+                    </form>
+                    <form method="post" asp-page-handler="Interact">
+                        <input type="hidden" asp-for="ActionType" value="encourage" />
+                        <button type="submit" class="action-button white">夸夸自己</button>
+                    </form>
+                </div>
+                <p class="game-card-hint">小游戏在首页顶部打开，方便你们答辩时把“主页工作台 + 游戏弹层”作为一个完整闭环演示出来。</p>
+                <a class="action-button purple" asp-page="/Index" style="width: 100%; display: flex; justify-content: center; align-items: center; box-sizing: border-box;">去首页打开猜拳</a>
+            </section>
+        </section>
+    </main>
+</div>
