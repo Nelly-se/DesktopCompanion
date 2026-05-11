@@ -43,11 +43,12 @@
                                       Direction="270" />
                 </Border.Effect>
                 <Grid Margin="8">
-                    <Image x:Name="BubbleImage"
+                    <Image x:Name="BubbleSpiritImage"
                            Stretch="UniformToFill"
                            Visibility="Collapsed" />
                     <Viewbox x:Name="BubbleFallbackView" Visibility="Visible">
-                        <TextBlock Text="灵"
+                        <TextBlock x:Name="BubbleFallbackText"
+                                   Text="灵"
                                    Foreground="#205C41"
                                    FontWeight="Bold" />
                     </Viewbox>
@@ -78,8 +79,9 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
                 <Border x:Name="AvatarBorder"
@@ -94,11 +96,12 @@
                         BorderThickness="1.5"
                         CornerRadius="29">
                     <Grid Margin="4">
-                        <Image x:Name="AvatarImage"
+                        <Image x:Name="PanelSpiritImage"
                                Stretch="UniformToFill"
                                Visibility="Collapsed" />
                         <Viewbox x:Name="AvatarFallbackView" Visibility="Visible">
-                            <TextBlock Text="灵"
+                            <TextBlock x:Name="PanelFallbackText"
+                                       Text="灵"
                                        Foreground="#205C41"
                                        FontWeight="Bold" />
                         </Viewbox>
@@ -122,7 +125,7 @@
                 <TextBlock x:Name="StatusText"
                            Grid.Row="2"
                            Grid.Column="1"
-                           Margin="0,8,0,10"
+                           Margin="0,8,0,8"
                            TextWrapping="Wrap"
                            Foreground="#4A6B5D"
                            Text="先完成最重要的一件事吧。" />
@@ -130,22 +133,29 @@
                 <StackPanel Grid.Row="3"
                             Grid.Column="1"
                             Orientation="Vertical">
-                    <TextBlock x:Name="MetricsText"
+                    <TextBlock x:Name="MetricsLine1Text"
+                               Margin="0,0,0,2"
+                               Foreground="#4A6B5D"
+                               Text="心情 88 · 亲密 120 · Lv.3" />
+                    <TextBlock x:Name="MetricsLine2Text"
                                Margin="0,0,0,8"
                                Foreground="#4A6B5D"
-                               Text="心情 88 · 亲密 120 · Lv.3 · 金币 20" />
-                    <StackPanel Orientation="Horizontal"
-                                HorizontalAlignment="Right">
-                        <Button Padding="10,4"
-                                Margin="0,0,8,0"
-                                Content="打开 SpiritDesk"
-                                Click="OpenSpiritDeskButton_Click"
-                                PreviewMouseLeftButtonDown="Control_PreviewMouseLeftButtonDown" />
-                        <Button Padding="10,4"
-                                Content="收起"
-                                Click="CollapseButton_Click"
-                                PreviewMouseLeftButtonDown="Control_PreviewMouseLeftButtonDown" />
-                    </StackPanel>
+                               Text="金币 20" />
+                </StackPanel>
+
+                <StackPanel Grid.Row="4"
+                            Grid.Column="1"
+                            Orientation="Horizontal"
+                            HorizontalAlignment="Right">
+                    <Button Padding="10,4"
+                            Margin="0,0,8,0"
+                            Content="打开 SpiritDesk"
+                            Click="OpenSpiritDeskButton_Click"
+                            PreviewMouseLeftButtonDown="Control_PreviewMouseLeftButtonDown" />
+                    <Button Padding="10,4"
+                            Content="收起"
+                            Click="CollapseButton_Click"
+                            PreviewMouseLeftButtonDown="Control_PreviewMouseLeftButtonDown" />
                 </StackPanel>
             </Grid>
         </Border>

@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.IO;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Windows;
@@ -13,10 +14,10 @@ namespace SpiritDesk.Shell;
 public partial class CompanionBubbleWindow : Window
 {
     private const double CollapsedSize = 88;
-    private const double DefaultExpandedWidth = 308;
-    private const double DefaultExpandedHeight = 172;
-    private const double MinExpandedWidth = 260;
-    private const double MinExpandedHeight = 150;
+    private const double DefaultExpandedWidth = 320;
+    private const double DefaultExpandedHeight = 220;
+    private const double MinExpandedWidth = 320;
+    private const double MinExpandedHeight = 220;
     private const double MaxExpandedWidth = 420;
     private const double MaxExpandedHeight = 260;
 
@@ -38,6 +39,10 @@ public partial class CompanionBubbleWindow : Window
     private readonly Window _mainWindow;
     private readonly ShellSettingsService _settingsService = new();
     private readonly DispatcherTimer _singleClickTimer;
+    private readonly string _logFilePath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "SpiritDesk",
+        "companion-bubble.log");
     private Point _pressMouseRelative;
     private bool _dragArm;
     private bool _isExiting;
@@ -64,8 +69,11 @@ public partial class CompanionBubbleWindow : Window
             ToggleExpanded();
         };
 
+        Log("CompanionBubbleWindow constructed.");
+
         Loaded += async (_, _) =>
         {
+            Log("CompanionBubbleWindow Loaded.");
             _isInitializing = true;
             RestoreWindowState();
             ApplyStatus(_status);
@@ -306,13 +314,21 @@ public partial class CompanionBubbleWindow : Window
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(4));
             var endpoint = new Uri(_baseUri, "/api/companion/current");
+            Log($"Companion API URL: {endpoint}");
             var dto = await _httpClient.GetFromJsonAsync<CompanionStatusDto>(endpoint, cts.Token);
-            if (dto is null) return;
+            if (dto is null)
+            {
+                Log("Companion API returned null payload.");
+                return;
+            }
+
+            Log($"Companion API result: name={dto.Name}, title={dto.Title}, imageUrl={dto.ImageUrl}");
             _status = NormalizeStatus(dto);
             await Dispatcher.InvokeAsync(() => ApplyStatus(_status));
         }
-        catch
+        catch (Exception ex)
         {
+            Log($"Companion API failed: {ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -337,49 +353,103 @@ public partial class CompanionBubbleWindow : Window
         NameText.Text = dto.Name;
         TitleText.Text = dto.Title;
         StatusText.Text = dto.StatusText;
-        MetricsText.Text = $"心情 {dto.Mood} · 亲密 {dto.Affinity} · Lv.{dto.Level} · 金币 {dto.Coins}";
+        MetricsLine1Text.Text = $"心情 {dto.Mood} · 亲密 {dto.Affinity} · Lv.{dto.Level}";
+        MetricsLine2Text.Text = $"金币 {dto.Coins}";
+        Log($"ApplyStatus called. imageUrl={dto.ImageUrl}");
         _ = ApplySpiritImageAsync(dto.ImageUrl);
     }
 
     private async Task ApplySpiritImageAsync(string imageUrl)
     {
-        if (string.IsNullOrWhiteSpace(imageUrl) || imageUrl == _lastImageUrl)
+        var stage = "init";
+        Log($"ApplySpiritImageAsync called. rawImageUrl={imageUrl}");
+
+        if (string.IsNullOrWhiteSpace(imageUrl))
         {
+            Log("Image URL empty, showing fallback glyph.");
+            ShowFallbackGlyph();
             return;
         }
 
-        _lastImageUrl = imageUrl;
+        if (imageUrl == _lastImageUrl)
+        {
+            Log("Image URL unchanged, skip reloading.");
+            return;
+        }
+
         try
         {
-            var absolute = new Uri(_baseUri, imageUrl.TrimStart('/'));
-            var bitmap = await Task.Run(() =>
-            {
-                var bmp = new BitmapImage();
-                bmp.BeginInit();
-                bmp.UriSource = absolute;
-                bmp.CacheOption = BitmapCacheOption.OnLoad;
-                bmp.EndInit();
-                bmp.Freeze();
-                return bmp;
-            });
+            stage = "resolve-url";
+            var imageUri = BuildImageUri(imageUrl);
+            Log($"Resolved fullImageUrl={imageUri}");
+            stage = "download-start";
+            Log("Start downloading image bytes.");
+            var bytes = await _httpClient.GetByteArrayAsync(imageUri);
+            stage = "download-success";
+            Log($"Image bytes downloaded. size={bytes.Length}");
 
-            BubbleImage.Source = bitmap;
-            AvatarImage.Source = bitmap;
-            BubbleImage.Visibility = Visibility.Visible;
-            AvatarImage.Visibility = Visibility.Visible;
+            BitmapImage bitmap;
+            stage = "bitmap-create-start";
+            Log("Stage 2: bitmap create start.");
+            using (var ms = new MemoryStream(bytes))
+            {
+                bitmap = new BitmapImage();
+                bitmap.BeginInit();
+                bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                bitmap.StreamSource = ms;
+                bitmap.EndInit();
+                bitmap.Freeze();
+            }
+            stage = "bitmap-create-success";
+            Log("Stage 2: bitmap create success.");
+
+            stage = "ui-apply-start";
+            Log("Stage 3: apply UI start.");
+            BubbleSpiritImage.Source = bitmap;
+            PanelSpiritImage.Source = bitmap;
+            stage = "ui-source-assigned";
+            Log("Stage 3: image source assigned.");
+            BubbleSpiritImage.Visibility = Visibility.Visible;
+            PanelSpiritImage.Visibility = Visibility.Visible;
             BubbleFallbackView.Visibility = Visibility.Collapsed;
             AvatarFallbackView.Visibility = Visibility.Collapsed;
+            BubbleFallbackText.Visibility = Visibility.Collapsed;
+            PanelFallbackText.Visibility = Visibility.Collapsed;
+            stage = "ui-fallback-collapsed";
+            Log("Stage 3: fallback collapsed.");
+            _lastImageUrl = imageUrl;
+            stage = "done";
+            Log("Image load success. Image Visible; fallback text Collapsed.");
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[SpiritDesk.Shell] Failed to load spirit image: {ex.Message}");
-            BubbleImage.Source = null;
-            AvatarImage.Source = null;
-            BubbleImage.Visibility = Visibility.Collapsed;
-            AvatarImage.Visibility = Visibility.Collapsed;
-            BubbleFallbackView.Visibility = Visibility.Visible;
-            AvatarFallbackView.Visibility = Visibility.Visible;
+            Log($"Image load failed at stage '{stage}': {ex.GetType().Name}: {ex.Message}");
+            ShowFallbackGlyph();
         }
+    }
+
+    private Uri BuildImageUri(string imageUrl)
+    {
+        if (Uri.TryCreate(imageUrl, UriKind.Absolute, out var absolute))
+        {
+            return absolute;
+        }
+
+        var normalizedPath = imageUrl.StartsWith("/") ? imageUrl : "/" + imageUrl;
+        return new Uri(_baseUri, normalizedPath);
+    }
+
+    private void ShowFallbackGlyph()
+    {
+        BubbleSpiritImage.Source = null;
+        PanelSpiritImage.Source = null;
+        BubbleSpiritImage.Visibility = Visibility.Collapsed;
+        PanelSpiritImage.Visibility = Visibility.Collapsed;
+        BubbleFallbackView.Visibility = Visibility.Visible;
+        AvatarFallbackView.Visibility = Visibility.Visible;
+        BubbleFallbackText.Visibility = Visibility.Visible;
+        PanelFallbackText.Visibility = Visibility.Visible;
+        Log("Fallback glyph visible. Image Collapsed.");
     }
 
     private sealed class CompanionStatusDto
@@ -399,7 +469,8 @@ public partial class CompanionBubbleWindow : Window
     {
         var settings = _settingsService.Load();
 
-        _theme = settings.CompanionTheme is "warm" ? "warm" : "mint";
+        var theme = string.IsNullOrWhiteSpace(settings.CompanionTheme) ? "mint" : settings.CompanionTheme.Trim().ToLowerInvariant();
+        _theme = theme == "warm" ? "warm" : "mint";
         ApplyTheme();
 
         Topmost = settings.CompanionBubbleTopmost;
@@ -519,4 +590,24 @@ public partial class CompanionBubbleWindow : Window
         if (value > max) return max;
         return value;
     }
+    private void Log(string message)
+    {
+        try
+        {
+            var line = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {message}";
+            var dir = Path.GetDirectoryName(_logFilePath);
+            if (!string.IsNullOrWhiteSpace(dir))
+            {
+                Directory.CreateDirectory(dir);
+            }
+
+            File.AppendAllText(_logFilePath, line + Environment.NewLine);
+            Debug.WriteLine(line);
+        }
+        catch
+        {
+        }
+    }
 }
+
+
