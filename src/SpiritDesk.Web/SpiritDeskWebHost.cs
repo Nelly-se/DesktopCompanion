@@ -113,6 +113,64 @@ public static class SpiritDeskWebHost
                 : Results.BadRequest(new { message = result.Message });
         });
 
+        app.MapGet("/api/companion/current", async (SpiritDeskService spiritDeskService, SpiritPersonaService personaService) =>
+        {
+            try
+            {
+                await spiritDeskService.EnsureInitializedAsync();
+                var spirits = await spiritDeskService.GetSpiritsAsync();
+                var fallbackSpirit = spirits.FirstOrDefault(x => x.Id == SpiritDesk.Core.Constants.SpiritIds.Light) ?? spirits.FirstOrDefault();
+
+                if (await spiritDeskService.NeedsSpiritSelectionAsync() || fallbackSpirit is null)
+                {
+                    return Results.Json(new
+                    {
+                        success = false,
+                        name = "卷卷晴",
+                        title = "工作学习发动机",
+                        statusText = "欢迎来到 SpiritDesk，先创建你的精灵档案吧。",
+                        imageUrl = "/assets/images/spirit-light.png",
+                        mood = 0,
+                        affinity = 0,
+                        level = 1,
+                        coins = 0
+                    });
+                }
+
+                var desk = await spiritDeskService.BuildViewModelAsync();
+                var spirit = desk.CurrentSpirit ?? fallbackSpirit;
+                var statusText = personaService.BuildHelperTip(spirit);
+
+                return Results.Json(new
+                {
+                    success = true,
+                    name = spirit.Name,
+                    title = spirit.Title,
+                    statusText,
+                    imageUrl = spirit.ImagePath,
+                    mood = desk.Profile.Mood,
+                    affinity = desk.Profile.Affinity,
+                    level = desk.Profile.Level,
+                    coins = desk.Profile.Coins
+                });
+            }
+            catch
+            {
+                return Results.Json(new
+                {
+                    success = false,
+                    name = "卷卷晴",
+                    title = "工作学习发动机",
+                    statusText = "欢迎来到 SpiritDesk，先创建你的精灵档案吧。",
+                    imageUrl = "/assets/images/spirit-light.png",
+                    mood = 0,
+                    affinity = 0,
+                    level = 1,
+                    coins = 0
+                });
+            }
+        });
+
         return app;
     }
 }

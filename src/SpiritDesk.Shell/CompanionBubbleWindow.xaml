@@ -1,32 +1,153 @@
-<Window x:Class="SpiritDesk.Shell.CompanionBubbleWindow"
+﻿<Window x:Class="SpiritDesk.Shell.CompanionBubbleWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="SpiritDeskBubble"
-        Width="96"
-        Height="96"
+        Width="88"
+        Height="88"
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
-        ResizeMode="NoResize"
+        ResizeMode="CanResizeWithGrip"
         Topmost="True"
         ShowInTaskbar="False"
         ShowActivated="False"
-        MouseDoubleClick="Bubble_MouseDoubleClick">
-    <Grid MouseLeftButtonDown="Bubble_MouseLeftButtonDown"
+        MouseDoubleClick="Bubble_MouseDoubleClick"
+        SizeChanged="Window_SizeChanged">
+    <Window.ContextMenu>
+        <ContextMenu>
+            <MenuItem Header="打开 SpiritDesk" Click="OpenSpiritDeskMenuItem_Click" />
+            <MenuItem Header="重置位置" Click="ResetPositionMenuItem_Click" />
+            <MenuItem x:Name="ToggleThemeMenuItem" Header="切换到暖色主题" Click="ToggleThemeMenuItem_Click" />
+            <MenuItem x:Name="ToggleTopmostMenuItem" Header="取消置顶" Click="ToggleTopmostMenuItem_Click" />
+            <Separator />
+            <MenuItem Header="退出" Click="ExitMenuItem_Click" />
+        </ContextMenu>
+    </Window.ContextMenu>
+
+    <Grid x:Name="RootDragArea"
+          Background="Transparent"
+          MouseLeftButtonDown="Bubble_MouseLeftButtonDown"
           MouseLeftButtonUp="Bubble_MouseLeftButtonUp"
-          MouseMove="Bubble_MouseMove"
-          MouseRightButtonUp="Bubble_MouseRightButtonUp">
-        <Image x:Name="SpiritImage"
-               Margin="4"
-               Stretch="Uniform"
-               RenderOptions.BitmapScalingMode="HighQuality"
-               SnapsToDevicePixels="True">
-            <Image.Effect>
+          MouseMove="Bubble_MouseMove">
+        <Grid x:Name="BubbleView" Visibility="Visible">
+            <Border x:Name="BubbleBorder"
+                    Margin="4"
+                    Background="#F6FBF7"
+                    BorderBrush="#BFE5CF"
+                    BorderThickness="2"
+                    CornerRadius="40">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="16"
+                                      ShadowDepth="2"
+                                      Opacity="0.32"
+                                      Direction="270" />
+                </Border.Effect>
+                <Grid Margin="8">
+                    <Image x:Name="BubbleImage"
+                           Stretch="UniformToFill"
+                           Visibility="Collapsed" />
+                    <Viewbox x:Name="BubbleFallbackView" Visibility="Visible">
+                        <TextBlock Text="灵"
+                                   Foreground="#205C41"
+                                   FontWeight="Bold" />
+                    </Viewbox>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <Border x:Name="PanelView"
+                Visibility="Collapsed"
+                Margin="4"
+                Padding="14"
+                Background="#F2FAF5"
+                BorderBrush="#BFE5CF"
+                BorderThickness="1.5"
+                CornerRadius="18">
+            <Border.Effect>
                 <DropShadowEffect BlurRadius="18"
                                   ShadowDepth="2"
-                                  Opacity="0.38"
+                                  Opacity="0.28"
                                   Direction="270" />
-            </Image.Effect>
-        </Image>
+            </Border.Effect>
+
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="70" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Border x:Name="AvatarBorder"
+                        Grid.RowSpan="4"
+                        Width="58"
+                        Height="58"
+                        Margin="0,4,10,0"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Top"
+                        Background="#E6F4EC"
+                        BorderBrush="#B8DFC9"
+                        BorderThickness="1.5"
+                        CornerRadius="29">
+                    <Grid Margin="4">
+                        <Image x:Name="AvatarImage"
+                               Stretch="UniformToFill"
+                               Visibility="Collapsed" />
+                        <Viewbox x:Name="AvatarFallbackView" Visibility="Visible">
+                            <TextBlock Text="灵"
+                                       Foreground="#205C41"
+                                       FontWeight="Bold" />
+                        </Viewbox>
+                    </Grid>
+                </Border>
+
+                <TextBlock x:Name="NameText"
+                           Grid.Column="1"
+                           FontSize="16"
+                           FontWeight="SemiBold"
+                           Foreground="#1A2E26"
+                           Text="卷卷晴" />
+
+                <TextBlock x:Name="TitleText"
+                           Grid.Row="1"
+                           Grid.Column="1"
+                           Margin="0,2,0,0"
+                           Foreground="#3A5B4D"
+                           Text="工作学习发动机" />
+
+                <TextBlock x:Name="StatusText"
+                           Grid.Row="2"
+                           Grid.Column="1"
+                           Margin="0,8,0,10"
+                           TextWrapping="Wrap"
+                           Foreground="#4A6B5D"
+                           Text="先完成最重要的一件事吧。" />
+
+                <StackPanel Grid.Row="3"
+                            Grid.Column="1"
+                            Orientation="Vertical">
+                    <TextBlock x:Name="MetricsText"
+                               Margin="0,0,0,8"
+                               Foreground="#4A6B5D"
+                               Text="心情 88 · 亲密 120 · Lv.3 · 金币 20" />
+                    <StackPanel Orientation="Horizontal"
+                                HorizontalAlignment="Right">
+                        <Button Padding="10,4"
+                                Margin="0,0,8,0"
+                                Content="打开 SpiritDesk"
+                                Click="OpenSpiritDeskButton_Click"
+                                PreviewMouseLeftButtonDown="Control_PreviewMouseLeftButtonDown" />
+                        <Button Padding="10,4"
+                                Content="收起"
+                                Click="CollapseButton_Click"
+                                PreviewMouseLeftButtonDown="Control_PreviewMouseLeftButtonDown" />
+                    </StackPanel>
+                </StackPanel>
+            </Grid>
+        </Border>
     </Grid>
 </Window>

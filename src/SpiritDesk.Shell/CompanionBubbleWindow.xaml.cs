@@ -1,64 +1,96 @@
+﻿using System.Diagnostics;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 
 namespace SpiritDesk.Shell;
 
 public partial class CompanionBubbleWindow : Window
 {
+    private const double CollapsedSize = 88;
+    private const double DefaultExpandedWidth = 308;
+    private const double DefaultExpandedHeight = 172;
+    private const double MinExpandedWidth = 260;
+    private const double MinExpandedHeight = 150;
+    private const double MaxExpandedWidth = 420;
+    private const double MaxExpandedHeight = 260;
+
+    private static readonly CompanionStatusDto DefaultStatus = new()
+    {
+        Success = false,
+        Name = "卷卷晴",
+        Title = "工作学习发动机",
+        StatusText = "先完成最重要的一件事吧。",
+        ImageUrl = "/assets/images/spirit-light.png",
+        Mood = 88,
+        Affinity = 120,
+        Level = 3,
+        Coins = 20
+    };
+
     private readonly Uri _baseUri;
-    private readonly HttpClient _http;
+    private readonly HttpClient _httpClient;
     private readonly Window _mainWindow;
-    private readonly System.Windows.Threading.DispatcherTimer _syncTimer;
-
-    private IReadOnlyList<SpiritItem> _spirits = [];
-    private string? _currentSpiritId;
-
+    private readonly ShellSettingsService _settingsService = new();
+    private readonly DispatcherTimer _singleClickTimer;
     private Point _pressMouseRelative;
     private bool _dragArm;
+    private bool _isExiting;
+    private bool _isExpanded;
+    private bool _isInitializing;
+    private double _panelWidth = DefaultExpandedWidth;
+    private double _panelHeight = DefaultExpandedHeight;
+    private string _theme = "mint";
+    private string _lastImageUrl = string.Empty;
+    private CompanionStatusDto _status = DefaultStatus;
 
-    public CompanionBubbleWindow(Uri baseUri, HttpClient http, Window mainWindow)
+    public CompanionBubbleWindow(Uri baseUri, HttpClient httpClient, Window mainWindow)
     {
         InitializeComponent();
         _baseUri = baseUri;
-        _http = http;
+        _httpClient = httpClient;
         _mainWindow = mainWindow;
+        ToolTip = "SpiritDesk 桌面浮球：单击展开，双击打开主窗口";
 
-        ToolTip = "SpiritDesk 桌面精灵 · 按住左键拖动 · 右键切换 · 双击打开主窗口";
+        _singleClickTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(230) };
+        _singleClickTimer.Tick += (_, _) =>
+        {
+            _singleClickTimer.Stop();
+            ToggleExpanded();
+        };
 
         Loaded += async (_, _) =>
         {
-            PositionAtPrimaryWorkAreaBottomRight();
-            await RefreshFromServerAsync();
+            _isInitializing = true;
+            RestoreWindowState();
+            ApplyStatus(_status);
+            await RefreshStatusAsync();
+            _isInitializing = false;
         };
-
-        _syncTimer = new System.Windows.Threading.DispatcherTimer
-        {
-            Interval = TimeSpan.FromSeconds(5)
-        };
-        _syncTimer.Tick += async (_, _) => await RefreshFromServerAsync();
-        _syncTimer.Start();
-    }
-
-    protected override void OnClosed(EventArgs e)
-    {
-        _syncTimer.Stop();
-        base.OnClosed(e);
+        Closing += (_, _) => SaveWindowState();
     }
 
     private void PositionAtPrimaryWorkAreaBottomRight()
     {
-        var wa = SystemParameters.WorkArea;
+        var workArea = SystemParameters.WorkArea;
         const double margin = 18;
-        Left = wa.Right - Width - margin;
-        Top = wa.Bottom - Height - margin;
+        Left = workArea.Right - Width - margin;
+        Top = workArea.Bottom - Height - margin;
     }
 
     private void Bubble_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
+        if (IsInteractionSource(e.OriginalSource))
+        {
+            _dragArm = false;
+            return;
+        }
+
         _pressMouseRelative = e.GetPosition(this);
         _dragArm = true;
     }
@@ -79,158 +111,412 @@ public partial class CompanionBubbleWindow : Window
         }
 
         _dragArm = false;
+        _singleClickTimer.Stop();
         try
         {
             DragMove();
+            EnsureInsideWorkArea();
+            SaveWindowState();
         }
         catch (InvalidOperationException)
         {
-            // 某些手势下 DragMove 可能无效，忽略即可
         }
     }
 
     private void Bubble_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
+        if (!_dragArm)
+        {
+            return;
+        }
+
         _dragArm = false;
+        if (IsInteractionSource(e.OriginalSource))
+        {
+            return;
+        }
+
+        if (e.ClickCount == 1)
+        {
+            _singleClickTimer.Stop();
+            _singleClickTimer.Start();
+        }
     }
 
     private void Bubble_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        _singleClickTimer.Stop();
+        e.Handled = true;
+        OpenMainWindow();
+    }
+
+    private void OpenSpiritDeskMenuItem_Click(object sender, RoutedEventArgs e) => OpenMainWindow();
+
+    private void ResetPositionMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        PositionAtPrimaryWorkAreaBottomRight();
+        EnsureInsideWorkArea();
+        SaveWindowState();
+    }
+
+    private void ToggleThemeMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        _theme = _theme == "warm" ? "mint" : "warm";
+        ApplyTheme();
+        SaveWindowState();
+    }
+
+    private void ToggleTopmostMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        Topmost = !Topmost;
+        SyncTopmostMenuHeader();
+        SaveWindowState();
+    }
+
+    private void ExitMenuItem_Click(object sender, RoutedEventArgs e) => ExitApplication();
+
+    private void OpenSpiritDeskButton_Click(object sender, RoutedEventArgs e) => OpenMainWindow();
+
+    private void CollapseButton_Click(object sender, RoutedEventArgs e) => Collapse();
+
+    private void Control_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        _dragArm = false;
+        _singleClickTimer.Stop();
+    }
+
+    private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (_isInitializing || !_isExpanded)
+        {
+            return;
+        }
+
+        _panelWidth = Clamp(Width, MinExpandedWidth, MaxExpandedWidth);
+        _panelHeight = Clamp(Height, MinExpandedHeight, MaxExpandedHeight);
+        SaveWindowState();
+    }
+
+    private void OpenMainWindow()
     {
         _mainWindow.WindowState = WindowState.Normal;
         _mainWindow.Show();
         _mainWindow.Activate();
     }
 
-    private void Bubble_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
+    private void ExitApplication()
     {
-        e.Handled = true;
-        ShowSpiritContextMenu();
-    }
-
-    private void ShowSpiritContextMenu()
-    {
-        var menu = new ContextMenu();
-
-        if (_spirits.Count == 0)
+        if (_isExiting)
         {
-            menu.Items.Add(new MenuItem { Header = "正在加载精灵列表…", IsEnabled = false });
-        }
-        else
-        {
-            foreach (var spirit in _spirits)
-            {
-                var id = spirit.Id;
-                var item = new MenuItem
-                {
-                    Header = spirit.Name,
-                    FontWeight = spirit.Id == _currentSpiritId ? FontWeights.SemiBold : FontWeights.Normal
-                };
-                item.Click += async (_, _) => await PostSelectSpiritAsync(id);
-                menu.Items.Add(item);
-            }
-
-            menu.Items.Add(new Separator());
-            var refreshItem = new MenuItem { Header = "同步当前形象" };
-            refreshItem.Click += async (_, _) => await RefreshFromServerAsync();
-            menu.Items.Add(refreshItem);
-
-            menu.Items.Add(new Separator());
-            var resetPosItem = new MenuItem { Header = "回到屏幕右下角" };
-            resetPosItem.Click += (_, _) => PositionAtPrimaryWorkAreaBottomRight();
-            menu.Items.Add(resetPosItem);
+            return;
         }
 
-        menu.PlacementTarget = this;
-        menu.IsOpen = true;
-    }
-
-    private async Task PostSelectSpiritAsync(string spiritId)
-    {
+        _isExiting = true;
         try
         {
-            var url = new Uri(_baseUri, "/api/companion/select-spirit");
-            using var response = await _http.PostAsJsonAsync(url, new { spiritId });
-            if (!response.IsSuccessStatusCode)
+            if (_mainWindow.IsLoaded)
             {
-                var detail = await response.Content.ReadAsStringAsync();
-                MessageBox.Show(
-                    $"切换精灵失败：{detail}",
-                    "SpiritDesk",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
+                _mainWindow.Close();
                 return;
             }
 
-            await RefreshFromServerAsync();
+            Close();
+            Application.Current.Shutdown();
         }
-        catch (Exception ex)
+        finally
         {
-            MessageBox.Show(
-                $"切换精灵失败：{ex.Message}",
-                "SpiritDesk",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
+            _isExiting = false;
         }
     }
 
-    private async Task RefreshFromServerAsync()
+    private void ToggleExpanded()
+    {
+        if (_isExpanded) Collapse(); else Expand();
+    }
+
+    private void Expand()
+    {
+        if (_isExpanded)
+        {
+            return;
+        }
+
+        _isExpanded = true;
+        BubbleView.Visibility = Visibility.Collapsed;
+        PanelView.Visibility = Visibility.Visible;
+        ResizeMode = ResizeMode.CanResizeWithGrip;
+        MinWidth = MinExpandedWidth;
+        MinHeight = MinExpandedHeight;
+        MaxWidth = MaxExpandedWidth;
+        MaxHeight = MaxExpandedHeight;
+        SetWindowSizeKeepBottomRight(_panelWidth, _panelHeight);
+        EnsureInsideWorkArea();
+        SaveWindowState();
+        _ = RefreshStatusAsync();
+    }
+
+    private void Collapse()
+    {
+        if (!_isExpanded)
+        {
+            return;
+        }
+
+        _isExpanded = false;
+        _panelWidth = Clamp(Width, MinExpandedWidth, MaxExpandedWidth);
+        _panelHeight = Clamp(Height, MinExpandedHeight, MaxExpandedHeight);
+        PanelView.Visibility = Visibility.Collapsed;
+        BubbleView.Visibility = Visibility.Visible;
+        ResizeMode = ResizeMode.NoResize;
+        MinWidth = CollapsedSize;
+        MinHeight = CollapsedSize;
+        MaxWidth = CollapsedSize;
+        MaxHeight = CollapsedSize;
+        SetWindowSizeKeepBottomRight(CollapsedSize, CollapsedSize);
+        EnsureInsideWorkArea();
+        SaveWindowState();
+    }
+
+    private void SetWindowSizeKeepBottomRight(double width, double height)
+    {
+        var right = Left + Width;
+        var bottom = Top + Height;
+
+        Width = width;
+        Height = height;
+
+        Left = right - Width;
+        Top = bottom - Height;
+    }
+
+    private void EnsureInsideWorkArea()
+    {
+        var workArea = SystemParameters.WorkArea;
+        if (Left < workArea.Left) Left = workArea.Left;
+        if (Top < workArea.Top) Top = workArea.Top;
+        if (Left + Width > workArea.Right) Left = workArea.Right - Width;
+        if (Top + Height > workArea.Bottom) Top = workArea.Bottom - Height;
+    }
+
+    private static bool IsInteractionSource(object? source) => source is Button || source is TextBox || source is PasswordBox;
+
+    private async Task RefreshStatusAsync()
     {
         try
         {
-            var url = new Uri(_baseUri, "/api/companion/state");
-            var dto = await _http.GetFromJsonAsync<CompanionStateDto>(url);
-            if (dto is null)
-            {
-                return;
-            }
-
-            _currentSpiritId = dto.CurrentSpiritId;
-            _spirits = dto.Spirits?.Select(static x => new SpiritItem(x.Id, x.Name, x.ImagePath)).ToList()
-                       ?? [];
-
-            var path = dto.NeedsSelection || string.IsNullOrWhiteSpace(_currentSpiritId)
-                ? _spirits.FirstOrDefault()?.ImagePath
-                : _spirits.FirstOrDefault(s => s.Id == _currentSpiritId)?.ImagePath;
-
-            var displayName = dto.NeedsSelection
-                ? "请先在主窗口选择精灵"
-                : _spirits.FirstOrDefault(s => s.Id == _currentSpiritId)?.Name ?? "精灵";
-
-            Dispatcher.Invoke(() =>
-            {
-                Title = $"SpiritDesk — {displayName}";
-                if (!string.IsNullOrWhiteSpace(path))
-                {
-                    var absolute = new Uri(_baseUri, path.TrimStart('/'));
-                    var bmp = new BitmapImage();
-                    bmp.BeginInit();
-                    bmp.UriSource = absolute;
-                    bmp.CacheOption = BitmapCacheOption.OnLoad;
-                    bmp.EndInit();
-                    bmp.Freeze();
-                    SpiritImage.Source = bmp;
-                }
-            });
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(4));
+            var endpoint = new Uri(_baseUri, "/api/companion/current");
+            var dto = await _httpClient.GetFromJsonAsync<CompanionStatusDto>(endpoint, cts.Token);
+            if (dto is null) return;
+            _status = NormalizeStatus(dto);
+            await Dispatcher.InvokeAsync(() => ApplyStatus(_status));
         }
         catch
         {
-            // 启动早期 Web 尚未就绪时忽略，定时器会重试
         }
     }
 
-    private sealed record SpiritItem(string Id, string Name, string ImagePath);
-
-    private sealed class CompanionStateDto
+    private static CompanionStatusDto NormalizeStatus(CompanionStatusDto input)
     {
-        public bool NeedsSelection { get; set; }
-        public string? CurrentSpiritId { get; set; }
-        public List<CompanionSpiritJson>? Spirits { get; set; }
+        return new CompanionStatusDto
+        {
+            Success = input.Success,
+            Name = string.IsNullOrWhiteSpace(input.Name) ? DefaultStatus.Name : input.Name,
+            Title = string.IsNullOrWhiteSpace(input.Title) ? DefaultStatus.Title : input.Title,
+            StatusText = string.IsNullOrWhiteSpace(input.StatusText) ? DefaultStatus.StatusText : input.StatusText,
+            ImageUrl = string.IsNullOrWhiteSpace(input.ImageUrl) ? DefaultStatus.ImageUrl : input.ImageUrl,
+            Mood = Math.Max(0, input.Mood),
+            Affinity = Math.Max(0, input.Affinity),
+            Level = Math.Max(1, input.Level),
+            Coins = Math.Max(0, input.Coins)
+        };
     }
 
-    private sealed class CompanionSpiritJson
+    private void ApplyStatus(CompanionStatusDto dto)
     {
-        public string Id { get; set; } = "";
-        public string Name { get; set; } = "";
-        public string ImagePath { get; set; } = "";
+        NameText.Text = dto.Name;
+        TitleText.Text = dto.Title;
+        StatusText.Text = dto.StatusText;
+        MetricsText.Text = $"心情 {dto.Mood} · 亲密 {dto.Affinity} · Lv.{dto.Level} · 金币 {dto.Coins}";
+        _ = ApplySpiritImageAsync(dto.ImageUrl);
+    }
+
+    private async Task ApplySpiritImageAsync(string imageUrl)
+    {
+        if (string.IsNullOrWhiteSpace(imageUrl) || imageUrl == _lastImageUrl)
+        {
+            return;
+        }
+
+        _lastImageUrl = imageUrl;
+        try
+        {
+            var absolute = new Uri(_baseUri, imageUrl.TrimStart('/'));
+            var bitmap = await Task.Run(() =>
+            {
+                var bmp = new BitmapImage();
+                bmp.BeginInit();
+                bmp.UriSource = absolute;
+                bmp.CacheOption = BitmapCacheOption.OnLoad;
+                bmp.EndInit();
+                bmp.Freeze();
+                return bmp;
+            });
+
+            BubbleImage.Source = bitmap;
+            AvatarImage.Source = bitmap;
+            BubbleImage.Visibility = Visibility.Visible;
+            AvatarImage.Visibility = Visibility.Visible;
+            BubbleFallbackView.Visibility = Visibility.Collapsed;
+            AvatarFallbackView.Visibility = Visibility.Collapsed;
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"[SpiritDesk.Shell] Failed to load spirit image: {ex.Message}");
+            BubbleImage.Source = null;
+            AvatarImage.Source = null;
+            BubbleImage.Visibility = Visibility.Collapsed;
+            AvatarImage.Visibility = Visibility.Collapsed;
+            BubbleFallbackView.Visibility = Visibility.Visible;
+            AvatarFallbackView.Visibility = Visibility.Visible;
+        }
+    }
+
+    private sealed class CompanionStatusDto
+    {
+        public bool Success { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Title { get; set; } = string.Empty;
+        public string StatusText { get; set; } = string.Empty;
+        public string ImageUrl { get; set; } = string.Empty;
+        public int Mood { get; set; }
+        public int Affinity { get; set; }
+        public int Level { get; set; }
+        public int Coins { get; set; }
+    }
+
+    private void RestoreWindowState()
+    {
+        var settings = _settingsService.Load();
+
+        _theme = settings.CompanionTheme is "warm" ? "warm" : "mint";
+        ApplyTheme();
+
+        Topmost = settings.CompanionBubbleTopmost;
+        SyncTopmostMenuHeader();
+
+        _panelWidth = Clamp(settings.CompanionPanelWidth <= 0 ? DefaultExpandedWidth : settings.CompanionPanelWidth, MinExpandedWidth, MaxExpandedWidth);
+        _panelHeight = Clamp(settings.CompanionPanelHeight <= 0 ? DefaultExpandedHeight : settings.CompanionPanelHeight, MinExpandedHeight, MaxExpandedHeight);
+
+        if (settings.CompanionBubbleExpanded) ExpandWithoutSaving(); else CollapseWithoutSaving();
+
+        if (IsSavedPositionVisible(settings.CompanionBubbleLeft, settings.CompanionBubbleTop))
+        {
+            Left = settings.CompanionBubbleLeft;
+            Top = settings.CompanionBubbleTop;
+            EnsureInsideWorkArea();
+            return;
+        }
+
+        PositionAtPrimaryWorkAreaBottomRight();
+        EnsureInsideWorkArea();
+    }
+
+    private void SaveWindowState()
+    {
+        if (_isInitializing) return;
+
+        var settings = new ShellSettings
+        {
+            CompanionBubbleLeft = Left,
+            CompanionBubbleTop = Top,
+            CompanionBubbleExpanded = _isExpanded,
+            CompanionBubbleTopmost = Topmost,
+            CompanionPanelWidth = _panelWidth,
+            CompanionPanelHeight = _panelHeight,
+            CompanionTheme = _theme
+        };
+
+        _settingsService.Save(settings);
+    }
+
+    private void ExpandWithoutSaving()
+    {
+        _isExpanded = true;
+        BubbleView.Visibility = Visibility.Collapsed;
+        PanelView.Visibility = Visibility.Visible;
+        ResizeMode = ResizeMode.CanResizeWithGrip;
+        Width = _panelWidth;
+        Height = _panelHeight;
+        MinWidth = MinExpandedWidth;
+        MinHeight = MinExpandedHeight;
+        MaxWidth = MaxExpandedWidth;
+        MaxHeight = MaxExpandedHeight;
+    }
+
+    private void CollapseWithoutSaving()
+    {
+        _isExpanded = false;
+        PanelView.Visibility = Visibility.Collapsed;
+        BubbleView.Visibility = Visibility.Visible;
+        ResizeMode = ResizeMode.NoResize;
+        MinWidth = CollapsedSize;
+        MinHeight = CollapsedSize;
+        MaxWidth = CollapsedSize;
+        MaxHeight = CollapsedSize;
+        Width = CollapsedSize;
+        Height = CollapsedSize;
+    }
+
+    private bool IsSavedPositionVisible(double left, double top)
+    {
+        if (!double.IsFinite(left) || !double.IsFinite(top)) return false;
+
+        var workArea = SystemParameters.WorkArea;
+        var probeWidth = _isExpanded ? _panelWidth : CollapsedSize;
+        var probeHeight = _isExpanded ? _panelHeight : CollapsedSize;
+        var right = left + probeWidth;
+        var bottom = top + probeHeight;
+        return right > workArea.Left + 24 && bottom > workArea.Top + 24 && left < workArea.Right - 24 && top < workArea.Bottom - 24;
+    }
+
+    private void SyncTopmostMenuHeader()
+    {
+        ToggleTopmostMenuItem.Header = Topmost ? "取消置顶" : "置顶";
+    }
+
+    private void ApplyTheme()
+    {
+        if (_theme == "warm")
+        {
+            BubbleBorder.Background = ToBrush("#FFF7EF");
+            BubbleBorder.BorderBrush = ToBrush("#F2C8A1");
+            PanelView.Background = ToBrush("#FFF7EF");
+            PanelView.BorderBrush = ToBrush("#F2C8A1");
+            AvatarBorder.Background = ToBrush("#FDE7D3");
+            AvatarBorder.BorderBrush = ToBrush("#EDBE91");
+            ToggleThemeMenuItem.Header = "切换到薄荷主题";
+            return;
+        }
+
+        BubbleBorder.Background = ToBrush("#F6FBF7");
+        BubbleBorder.BorderBrush = ToBrush("#BFE5CF");
+        PanelView.Background = ToBrush("#F2FAF5");
+        PanelView.BorderBrush = ToBrush("#BFE5CF");
+        AvatarBorder.Background = ToBrush("#E6F4EC");
+        AvatarBorder.BorderBrush = ToBrush("#B8DFC9");
+        ToggleThemeMenuItem.Header = "切换到暖色主题";
+    }
+
+    private static Brush ToBrush(string hex)
+    {
+        return (Brush)new BrushConverter().ConvertFromString(hex)!;
+    }
+
+    private static double Clamp(double value, double min, double max)
+    {
+        if (value < min) return min;
+        if (value > max) return max;
+        return value;
     }
 }
