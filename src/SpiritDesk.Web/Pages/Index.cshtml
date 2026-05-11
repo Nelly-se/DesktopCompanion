@@ -1,11 +1,11 @@
-@page
+﻿@page
 @using SpiritDesk.Web.Helpers
 @using System.Text.Json
 @inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 @model IndexModel
 @{
     var afTokens = Antiforgery.GetAndStoreTokens(HttpContext);
-    ViewData["Title"] = "SpiritDesk";
+    ViewData["Title"] = "精灵主页";
     var profile = Model.Desk.Profile;
     var spirit = Model.Desk.CurrentSpirit;
     var messages = Model.Desk.ChatMessages;
@@ -43,319 +43,32 @@
     <aside class="sidebar">
         <partial name="Shared/_SidebarCollapseToggle" />
         <div class="sidebar-body">
-            <div class="sidebar-brand-row brand-compact">
-                <div class="brand-avatar">灵</div>
-                <div class="brand-text">
-                    <h2>光合桌面</h2>
-                    <p>SpiritDesk</p>
-                </div>
-            </div>
-
+            <div class="sidebar-brand-row brand-compact"><div class="brand-avatar">灵</div><div class="brand-text"><h2>光合桌面</h2><p>SpiritDesk</p></div></div>
             <nav class="nav-menu">
-                <a class="nav-item active" asp-page="/Index" title="首页"><span class="nav-label">首页</span></a>
-                <a class="nav-item" asp-page="/Assistant" title="助手"><span class="nav-label">助手</span></a>
-                <a class="nav-item" asp-page="/Chat" title="回顾"><span class="nav-label">回顾</span></a>
-                <a class="nav-item" asp-page="/Settings" title="设置"><span class="nav-label">设置</span></a>
+                <a class="nav-item active" asp-page="/Index"><span class="nav-label">首页 / 精灵主页</span></a>
+                <a class="nav-item" asp-page="/Chat"><span class="nav-label">精灵聊天</span></a>
+                <a class="nav-item" asp-page="/Assistant"><span class="nav-label">任务助手</span></a>
+                <a class="nav-item" asp-page="/Settings"><span class="nav-label">精灵设置</span></a>
             </nav>
-
-            <section class="sidebar-task-module">
-                <div class="sidebar-task-head">
-                    <span class="sidebar-task-title">今日待办</span>
-                    <span class="tiny-badge">@todayTasks.Count</span>
-                </div>
+            <section class="sidebar-task-module"><div class="sidebar-task-head"><span class="sidebar-task-title">今日待办</span><span class="tiny-badge">@todayTasks.Count</span></div>
                 <p class="sidebar-task-date">@DateTime.Now.ToString("dddd，M月d日")</p>
-                <div class="sidebar-task-list">
-                    @if (todayTasks.Count == 0)
-                    {
-                        <p class="sidebar-task-empty">今天还没有任务</p>
-                    }
-                    else
-                    {
-                        @foreach (var task in todayTasks.Take(8))
-                        {
-                            <div class="sidebar-task-row @(task.IsCompleted ? "done" : "")">
-                                <div class="sidebar-task-copy">
-                                    <strong>@task.Title</strong>
-                                    @if (!string.IsNullOrWhiteSpace(task.Description))
-                                    {
-                                        <span class="sidebar-task-snippet">@task.Description</span>
-                                    }
-                                </div>
-                                @if (!task.IsCompleted)
-                                {
-                                    <form method="post" asp-page-handler="CompleteTask" class="sidebar-task-done-form">
-                                        <input type="hidden" asp-for="TaskId" value="@task.Id" />
-                                        <button type="submit" class="sidebar-task-check" title="完成">✓</button>
-                                    </form>
-                                }
-                                else
-                                {
-                                    <span class="sidebar-task-check is-done" title="已完成">✓</span>
-                                }
-                            </div>
-                        }
-                    }
-                </div>
-                <form method="post" asp-page-handler="AddTask" class="sidebar-quick-task">
-                    <input asp-for="NewTaskTitle" class="sidebar-quick-input" placeholder="新建任务…" />
-                    <input asp-for="NewTaskDescription" class="sidebar-quick-input" placeholder="任务说明（可选）" />
-                    <input asp-for="NewTaskDueAt" class="sidebar-quick-due" type="datetime-local" title="截止时间（可选）" />
-                    <button type="submit" class="sidebar-quick-submit">添加</button>
-                </form>
-            </section>
-
-            <section class="sidebar-section spirit-pool">
-                <div class="sidebar-title-row">
-                    <span>精灵球</span>
-                    <span class="tiny-badge">@Model.Desk.Spirits.Count</span>
-                </div>
-                <div class="mini-dock-wrap">
-                    <div class="mini-dock">
-                        @foreach (var item in Model.Desk.Spirits)
-                        {
-                            <form method="post" asp-page-handler="SelectSpirit" class="mini-dock-form">
-                                <input type="hidden" asp-for="SpiritId" value="@item.Id" />
-                                <button type="submit" class="mini-ball @(item.Id == spirit.Id ? "active" : "")" style="--ball-accent:@item.AccentColor" title="@item.Name">
-                                    <img src="@item.ImagePath" alt="@item.Name" />
-                                </button>
-                            </form>
-                        }
-                    </div>
-                </div>
+                <div class="sidebar-task-list">@if (todayTasks.Count == 0){<p class="sidebar-task-empty">今天还没有待办任务。</p>}else{@foreach (var task in todayTasks.Take(8)){<div class="sidebar-task-row @(task.IsCompleted ? "done" : "")"><div class="sidebar-task-copy"><strong>@task.Title</strong>@if (!string.IsNullOrWhiteSpace(task.Description)){<span class="sidebar-task-snippet">@task.Description</span>}</div>@if (!task.IsCompleted){<form method="post" asp-page-handler="CompleteTask" class="sidebar-task-done-form"><input type="hidden" asp-for="TaskId" value="@task.Id" /><button type="submit" class="sidebar-task-check" title="完成">✓</button></form>}else{<span class="sidebar-task-check is-done" title="已完成">✓</span>}</div>}}</div>
+                <form method="post" asp-page-handler="AddTask" class="sidebar-quick-task"><input asp-for="NewTaskTitle" class="sidebar-quick-input" placeholder="新建任务" /><input asp-for="NewTaskDescription" class="sidebar-quick-input" placeholder="任务说明（可选）" /><input asp-for="NewTaskDueAt" class="sidebar-quick-due" type="datetime-local" title="截止时间（可选）" /><button type="submit" class="sidebar-quick-submit">添加</button></form>
             </section>
         </div>
     </aside>
 
     <main class="main-workbench desk-main">
-        <header class="desk-top-bar">
-            <div class="desk-top-bar-text">
-                <h1 class="desk-title">@greetingPrefix，@(string.IsNullOrWhiteSpace(profile.Nickname) ? "朋友" : profile.Nickname)</h1>
-                <p class="desk-subtitle">与 <strong>@spirit.Name</strong> 一起 · @Model.Desk.HelperTip</p>
-            </div>
-            <div class="desk-top-actions">
-                <span class="desk-clock">@DateTime.Now.ToString("yyyy-MM-dd HH:mm")</span>
-                @if (gamePlayed >= gameMax)
-                {
-                    <button type="button" class="toolbar-pill" disabled>猜拳已用尽</button>
-                }
-                else
-                {
-                    <button type="button" class="toolbar-pill game-panel-open">猜拳</button>
-                }
-                <a class="toolbar-pill" asp-page="/Assistant">助手</a>
-                <a class="toolbar-pill" asp-page="/Chat">回顾</a>
-            </div>
-        </header>
-
-        @if (!string.IsNullOrWhiteSpace(Model.NoticeMessage))
-        {
-            <div class="notice-banner">@Model.NoticeMessage</div>
-        }
-
-        <section class="desk-overview-grid">
-            <section class="content-card reminder-card">
-                <div class="card-head">
-                    <div>
-                        <span class="card-kicker">提醒</span>
-                        <h3>24 小时内到期任务</h3>
-                    </div>
-                    <span class="tiny-badge">@dueReminders.Count</span>
-                </div>
-
-                @if (dueReminders.Count == 0)
-                {
-                    <p class="board-subtitle">当前没有 24 小时内到期的任务，节奏比较稳定。</p>
-                }
-                else
-                {
-                    <div class="reminder-list">
-                        @foreach (var task in dueReminders)
-                        {
-                            <div class="reminder-item">
-                                <div>
-                                    <strong>@task.Title</strong>
-                                    <p>@(task.DueAt?.ToString("MM-dd HH:mm")) 到期</p>
-                                </div>
-                                <form method="post" asp-page-handler="CompleteTask">
-                                    <input type="hidden" asp-for="TaskId" value="@task.Id" />
-                                    <button type="submit" class="small-action">完成</button>
-                                </form>
-                            </div>
-                        }
-                    </div>
-                }
-            </section>
-
-            <section class="content-card profile-mini-card">
-                <div class="card-head">
-                    <div>
-                        <span class="card-kicker">成长</span>
-                        <h3>@spirit.Name 的陪伴状态</h3>
-                    </div>
-                    <span class="tiny-badge">@spirit.Mbti</span>
-                </div>
-                <div class="task-overview-grid">
-                    <div class="task-overview-pill">
-                        <strong>@profile.Mood</strong>
-                        <span>心情值</span>
-                    </div>
-                    <div class="task-overview-pill">
-                        <strong>@profile.Affinity</strong>
-                        <span>亲密度</span>
-                    </div>
-                    <div class="task-overview-pill">
-                        <strong>@profile.Level</strong>
-                        <span>等级</span>
-                    </div>
-                    <div class="task-overview-pill">
-                        <strong>@profile.Coins</strong>
-                        <span>金币</span>
-                    </div>
-                </div>
-            </section>
-        </section>
-
-        <section class="desk-cal-shell content-card">
-            <div class="desk-cal-toolbar">
-                <div class="desk-cal-filters">
-                    <button type="button" class="cal-filter-btn active" data-cal-filter="pending">待处理任务</button>
-                    <button type="button" class="cal-filter-btn" data-cal-filter="all">全部任务</button>
-                </div>
-                <div class="desk-cal-nav">
-                    <button type="button" class="cal-nav-arrow" data-cal-prev aria-label="上一段">‹</button>
-                    <h2 class="desk-cal-title" data-cal-title></h2>
-                    <button type="button" class="cal-nav-arrow" data-cal-next aria-label="下一段">›</button>
-                    <button type="button" class="cal-today-btn" data-cal-today>今天</button>
-                </div>
-                <div class="desk-cal-views">
-                    <button type="button" class="cal-view-btn" data-cal-view="day">日视图</button>
-                    <button type="button" class="cal-view-btn active" data-cal-view="week">周视图</button>
-                    <button type="button" class="cal-view-btn" data-cal-view="month">月视图</button>
-                </div>
-            </div>
-            <div id="deskCalendarRoot" class="desk-cal-root"></div>
-        </section>
-
-        <section class="desk-lower-grid">
-            <section class="content-card task-manage-card">
-                <div class="card-head">
-                    <div>
-                        <span class="card-kicker">任务</span>
-                        <h3>任务管理</h3>
-                    </div>
-                    <span class="tiny-badge">@pendingTasks.Count</span>
-                </div>
-
-                <div class="manage-task-list">
-                    @foreach (var task in pendingTasks.Take(6))
-                    {
-                        <article class="manage-task-item">
-                            <div class="manage-task-main">
-                                <strong>@task.Title</strong>
-                                @if (!string.IsNullOrWhiteSpace(task.Description))
-                                {
-                                    <p>@task.Description</p>
-                                }
-                                <span>@(task.DueAt?.ToString("yyyy-MM-dd HH:mm") ?? "未设置截止时间")</span>
-                            </div>
-                            <div class="manage-task-actions">
-                                <form method="post" asp-page-handler="CompleteTask">
-                                    <input type="hidden" asp-for="TaskId" value="@task.Id" />
-                                    <button type="submit" class="small-action">完成</button>
-                                </form>
-                                <details class="task-edit-box">
-                                    <summary>编辑</summary>
-                                    <form method="post" asp-page-handler="UpdateTask" class="task-edit-form">
-                                        <input type="hidden" asp-for="TaskId" value="@task.Id" />
-                                        <input asp-for="EditTaskTitle" class="soft-input" value="@task.Title" />
-                                        <textarea asp-for="EditTaskDescription" class="soft-input" rows="2">@task.Description</textarea>
-                                        <input asp-for="EditTaskDueAt" class="soft-input" type="datetime-local" value="@task.DueAt?.ToString("yyyy-MM-ddTHH:mm")" />
-                                        <button type="submit" class="small-action">保存</button>
-                                    </form>
-                                </details>
-                                <form method="post" asp-page-handler="DeleteTask" onsubmit="return confirm('确定删除这个任务吗？');">
-                                    <input type="hidden" asp-for="TaskId" value="@task.Id" />
-                                    <button type="submit" class="small-action danger">删除</button>
-                                </form>
-                            </div>
-                        </article>
-                    }
-                </div>
-            </section>
-
-            <section class="desk-chat-dock content-card">
-                <div class="desk-chat-dock-head">
-                    <div>
-                        <span class="desk-chat-tag">@spirit.Name</span>
-                        <span class="desk-chat-meta">@spirit.Title</span>
-                    </div>
-                    <a class="chat-link" asp-page="/Chat">完整回顾</a>
-                </div>
-                <div class="desk-chat-stream">
-                    @if (recentMessages.Count == 0)
-                    {
-                        <p class="desk-chat-placeholder">还没有对话，在下方跟 @spirit.Name 打个招呼吧。</p>
-                    }
-                    else
-                    {
-                        @foreach (var message in recentMessages)
-                        {
-                            <div class="desk-chat-line @(message.Sender == "user" ? "user" : "spirit")">
-                                <span class="desk-chat-who">@(message.Sender == "user" ? profile.Nickname : spirit.Name)</span>
-                                <span class="desk-chat-msg">@message.Content</span>
-                            </div>
-                        }
-                    }
-                </div>
-                <form method="post" asp-page-handler="SendMessage" class="desk-chat-form">
-                    <textarea asp-for="MessageText" class="soft-input desk-chat-input" rows="2" placeholder="发送消息给 @spirit.Name…"></textarea>
-                    <button type="submit" class="action-button purple desk-chat-send">发送</button>
-                </form>
-            </section>
-        </section>
-
-        <form method="post" asp-page="/Index" id="desk-antiforgery-source" class="desk-antiforgery-source" aria-hidden="true">
-            <input type="hidden" name="__RequestVerificationToken" value="@afTokens.RequestToken" />
-        </form>
+        <header class="desk-top-bar"><div class="desk-top-bar-text"><h1 class="desk-title">@greetingPrefix，@(string.IsNullOrWhiteSpace(profile.Nickname) ? "朋友" : profile.Nickname)</h1><p class="desk-subtitle">和 <strong>@spirit.Name</strong> 一起继续推进 · @Model.Desk.HelperTip</p></div><div class="desk-top-actions"><span class="desk-clock">@DateTime.Now.ToString("yyyy-MM-dd HH:mm")</span><button type="button" class="toolbar-pill game-panel-open" @(gamePlayed >= gameMax ? "disabled" : null)>猜拳小游戏</button><a class="toolbar-pill" asp-page="/Assistant">任务助手</a><a class="toolbar-pill" asp-page="/Chat">精灵聊天</a></div></header>
+        @if (!string.IsNullOrWhiteSpace(Model.NoticeMessage)){<div class="notice-banner">@Model.NoticeMessage</div>}
+        <section class="desk-overview-grid"><section class="content-card reminder-card"><div class="card-head"><div><span class="card-kicker">提醒</span><h3>24 小时内到期任务</h3></div><span class="tiny-badge">@dueReminders.Count</span></div>@if (dueReminders.Count == 0){<p class="board-subtitle">当前没有 24 小时内到期的任务。</p>}else{<div class="reminder-list">@foreach (var task in dueReminders){<div class="reminder-item"><div><strong>@task.Title</strong><p>@(task.DueAt?.ToString("MM-dd HH:mm")) 到期</p></div><form method="post" asp-page-handler="CompleteTask"><input type="hidden" asp-for="TaskId" value="@task.Id" /><button type="submit" class="small-action">完成</button></form></div>}</div>}</section>
+            <section class="content-card profile-mini-card"><div class="card-head"><div><span class="card-kicker">成长</span><h3>@spirit.Name 的陪伴状态</h3></div><span class="tiny-badge">@spirit.Mbti</span></div><div class="task-overview-grid"><div class="task-overview-pill"><strong>@profile.Mood</strong><span>心情值</span></div><div class="task-overview-pill"><strong>@profile.Affinity</strong><span>亲密度</span></div><div class="task-overview-pill"><strong>@profile.Level</strong><span>等级</span></div><div class="task-overview-pill"><strong>@profile.Coins</strong><span>金币</span></div></div></section></section>
+        <section class="desk-cal-shell content-card"><div class="desk-cal-toolbar"><div class="desk-cal-filters"><button type="button" class="cal-filter-btn active" data-cal-filter="pending">待处理任务</button><button type="button" class="cal-filter-btn" data-cal-filter="all">全部任务</button></div><div class="desk-cal-nav"><button type="button" class="cal-nav-arrow" data-cal-prev aria-label="上一段">‹</button><h2 class="desk-cal-title" data-cal-title></h2><button type="button" class="cal-nav-arrow" data-cal-next aria-label="下一段">›</button><button type="button" class="cal-today-btn" data-cal-today>今天</button></div><div class="desk-cal-views"><button type="button" class="cal-view-btn" data-cal-view="day">日视图</button><button type="button" class="cal-view-btn active" data-cal-view="week">周视图</button><button type="button" class="cal-view-btn" data-cal-view="month">月视图</button></div></div><div id="deskCalendarRoot" class="desk-cal-root"></div></section>
+        <section class="desk-lower-grid"><section class="content-card task-manage-card"><div class="card-head"><div><span class="card-kicker">任务</span><h3>任务管理</h3></div><span class="tiny-badge">@pendingTasks.Count</span></div><div class="manage-task-list">@foreach (var task in pendingTasks.Take(6)){<article class="manage-task-item"><div class="manage-task-main"><strong>@task.Title</strong>@if (!string.IsNullOrWhiteSpace(task.Description)){<p>@task.Description</p>}<span>@(task.DueAt?.ToString("yyyy-MM-dd HH:mm") ?? "未设置截止时间")</span></div><div class="manage-task-actions"><form method="post" asp-page-handler="CompleteTask"><input type="hidden" asp-for="TaskId" value="@task.Id" /><button type="submit" class="small-action">完成</button></form><details class="task-edit-box"><summary>编辑</summary><form method="post" asp-page-handler="UpdateTask" class="task-edit-form"><input type="hidden" asp-for="TaskId" value="@task.Id" /><input asp-for="EditTaskTitle" class="soft-input" value="@task.Title" /><textarea asp-for="EditTaskDescription" class="soft-input" rows="2">@task.Description</textarea><input asp-for="EditTaskDueAt" class="soft-input" type="datetime-local" value="@task.DueAt?.ToString("yyyy-MM-ddTHH:mm")" /><button type="submit" class="small-action">保存</button></form></details><form method="post" asp-page-handler="DeleteTask" onsubmit="return confirm('确定删除这个任务吗？');"><input type="hidden" asp-for="TaskId" value="@task.Id" /><button type="submit" class="small-action danger">删除</button></form></div></article>}</div></section>
+            <section class="desk-chat-dock content-card"><div class="desk-chat-dock-head"><div><span class="desk-chat-tag">@spirit.Name</span><span class="desk-chat-meta">@spirit.Title</span></div><a class="chat-link" asp-page="/Chat">完整聊天</a></div><div class="desk-chat-stream">@if (recentMessages.Count == 0){<p class="desk-chat-placeholder">还没有对话，先和 @spirit.Name 打个招呼吧。</p>}else{@foreach (var message in recentMessages){<div class="desk-chat-line @(message.Sender == "user" ? "user" : "spirit")"><span class="desk-chat-who">@(message.Sender == "user" ? profile.Nickname : spirit.Name)</span><span class="desk-chat-msg">@message.Content</span></div>}}</div><form method="post" asp-page-handler="SendMessage" class="desk-chat-form"><textarea asp-for="MessageText" class="soft-input desk-chat-input" rows="2" placeholder="发送消息给 @spirit.Name"></textarea><button type="submit" class="action-button purple desk-chat-send">发送</button></form></section></section>
+        <form method="post" asp-page="/Index" id="desk-antiforgery-source" class="desk-antiforgery-source" aria-hidden="true"><input type="hidden" name="__RequestVerificationToken" value="@afTokens.RequestToken" /></form>
     </main>
 </div>
-
 <script id="desk-calendar-data" type="application/json">@Html.Raw(calendarJson)</script>
-
-@section Scripts {
-    <script src="~/js/desk-calendar.js" asp-append-version="true"></script>
-}
-
-<div id="gameModal" class="game-modal" aria-hidden="true">
-    <div class="game-modal-backdrop" data-close-game-modal></div>
-    <div class="game-modal-panel" role="dialog" aria-modal="true" aria-labelledby="gameModalTitle">
-        <div class="game-modal-head">
-            <div>
-                <h3 id="gameModalTitle">猜拳对战</h3>
-                <p>今日已对局 @gamePlayed / @gameMax · 选择你的出牌。</p>
-            </div>
-            <button type="button" class="game-modal-close" data-close-game-modal>关闭</button>
-        </div>
-        <div class="game-grid">
-            @if (gamePlayed >= gameMax)
-            {
-                <p style="grid-column: 1 / -1; margin: 0; color: var(--text-soft);">今日小游戏次数已用完。</p>
-            }
-            else
-            {
-                <form method="post" asp-page-handler="PlayGame">
-                    <input type="hidden" asp-for="GameChoice" value="rock" />
-                    <button type="submit" class="action-button amber">石头</button>
-                </form>
-                <form method="post" asp-page-handler="PlayGame">
-                    <input type="hidden" asp-for="GameChoice" value="paper" />
-                    <button type="submit" class="action-button amber">布</button>
-                </form>
-                <form method="post" asp-page-handler="PlayGame">
-                    <input type="hidden" asp-for="GameChoice" value="scissors" />
-                    <button type="submit" class="action-button amber">剪刀</button>
-                </form>
-            }
-        </div>
-    </div>
-</div>
+@section Scripts { <script src="~/js/desk-calendar.js" asp-append-version="true"></script> }
+<div id="gameModal" class="game-modal" aria-hidden="true"><div class="game-modal-backdrop" data-close-game-modal></div><div class="game-modal-panel" role="dialog" aria-modal="true" aria-labelledby="gameModalTitle"><div class="game-modal-head"><div><h3 id="gameModalTitle">猜拳小游戏</h3><p>今日已对局 @gamePlayed / @gameMax，选择你的出牌。</p></div><button type="button" class="game-modal-close" data-close-game-modal>关闭</button></div><div class="game-grid">@if (gamePlayed >= gameMax){<p style="grid-column: 1 / -1; margin: 0; color: var(--text-soft);">今日小游戏次数已用完。</p>}else{<form method="post" asp-page-handler="PlayGame"><input type="hidden" asp-for="GameChoice" value="rock" /><button type="submit" class="action-button amber">石头</button></form><form method="post" asp-page-handler="PlayGame"><input type="hidden" asp-for="GameChoice" value="paper" /><button type="submit" class="action-button amber">布</button></form><form method="post" asp-page-handler="PlayGame"><input type="hidden" asp-for="GameChoice" value="scissors" /><button type="submit" class="action-button amber">剪刀</button></form>}</div></div></div>

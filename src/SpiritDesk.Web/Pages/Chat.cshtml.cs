@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using SpiritDesk.Web.Models;
 using SpiritDesk.Web.Services;
@@ -17,11 +17,7 @@ public class ChatModel(SpiritDeskService spiritDeskService) : PageModel
 
     public async Task<IActionResult> OnGetAsync()
     {
-        if (await spiritDeskService.NeedsSpiritSelectionAsync())
-        {
-            return RedirectToPage("/Spirits/Select");
-        }
-
+        if (await spiritDeskService.NeedsSpiritSelectionAsync()) return RedirectToPage("/Spirits/Select");
         ChatHistory = await spiritDeskService.BuildChatHistoryViewModelAsync();
         return Page();
     }

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="utf-8" />
@@ -8,7 +8,10 @@
 </head>
 <body>
     @RenderBody()
-    <partial name="Shared/_FloatingCompanion" />
+    @if (ViewData["HideFloatingCompanion"] as bool? != true)
+    {
+        <partial name="_FloatingCompanion" />
+    }
     <script src="~/js/site.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>

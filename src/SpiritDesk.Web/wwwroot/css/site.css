@@ -35,18 +35,48 @@ body {
   position: fixed;
   right: 24px;
   bottom: 24px;
-  z-index: 1500;
-  display: flex;
-  align-items: flex-end;
-  gap: 14px;
+  z-index: 99999;
+  width: 96px;
+  height: 96px;
+  display: block;
+  pointer-events: auto;
+  touch-action: none;
+  overflow: visible;
+}
+
+#floating-companion,
+#floating-companion * {
+  user-select: none;
+}
+
+#floating-companion img {
+  -webkit-user-drag: none;
+  user-drag: none;
+  user-select: none;
   pointer-events: none;
 }
 
-.floating-companion-toggle,
-.floating-companion-panel,
-.floating-companion-close,
-.floating-action {
+#floating-companion button,
+#floating-companion .floating-companion-toggle,
+#floating-companion .floating-companion-panel,
+#floating-companion .floating-companion-close,
+#floating-companion .floating-action {
   pointer-events: auto;
+}
+
+#floating-companion .floating-companion-toggle {
+  cursor: grab;
+}
+
+#floating-companion .floating-companion-toggle:active {
+  cursor: grabbing;
+}
+
+#floating-companion .floating-companion-aura,
+#floating-companion .floating-companion-avatar,
+#floating-companion .floating-companion-ping {
+  pointer-events: none;
+  user-select: none;
 }
 
 .floating-companion-toggle {
@@ -60,6 +90,9 @@ body {
   display: grid;
   place-items: center;
   padding: 0;
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
 }
 
 .floating-companion-aura {
@@ -98,6 +131,9 @@ body {
 }
 
 .floating-companion-panel {
+  position: absolute;
+  right: 0;
+  bottom: 108px;
   width: min(320px, calc(100vw - 32px));
   border-radius: 24px;
   border: 1px solid rgba(255, 255, 255, 0.68);

@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using SpiritDesk.Core.Entities;
 using SpiritDesk.Web.Services;
@@ -9,25 +9,15 @@ public class SelectModel(SpiritDeskService spiritDeskService) : PageModel
 {
     public List<SpiritDefinition> Spirits { get; private set; } = [];
 
-    [BindProperty]
-    public string SpiritId { get; set; } = string.Empty;
+    [BindProperty] public string SpiritId { get; set; } = string.Empty;
+    [BindProperty] public string Nickname { get; set; } = string.Empty;
 
-    [BindProperty]
-    public string Nickname { get; set; } = string.Empty;
-
-    [TempData]
-    public string? ErrorMessage { get; set; }
-
-    [TempData]
-    public string? NoticeMessage { get; set; }
+    [TempData] public string? ErrorMessage { get; set; }
+    [TempData] public string? NoticeMessage { get; set; }
 
     public async Task<IActionResult> OnGetAsync()
     {
-        if (!await spiritDeskService.NeedsSpiritSelectionAsync())
-        {
-            return RedirectToPage("/Index");
-        }
-
+        if (!await spiritDeskService.NeedsSpiritSelectionAsync()) return RedirectToPage("/Index");
         Spirits = await spiritDeskService.GetSpiritsAsync();
         return Page();
     }
@@ -57,8 +47,7 @@ public class SelectModel(SpiritDeskService spiritDeskService) : PageModel
             return Page();
         }
 
-        var displayName = Nickname.Trim();
-        NoticeMessage = $"档案创建成功，{displayName} 已与 {result.SpiritName} 完成绑定。";
+        NoticeMessage = $"档案创建成功：{Nickname.Trim()} 已与 {result.SpiritName} 绑定。";
         return RedirectToPage("/Index");
     }
 }

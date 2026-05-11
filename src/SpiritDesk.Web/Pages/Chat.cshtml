@@ -1,12 +1,11 @@
 ﻿@page
 @model SpiritDesk.Web.Pages.ChatModel
 @{
-    ViewData["Title"] = "聊天回顾";
+    ViewData["Title"] = "精灵聊天";
     var profile = Model.ChatHistory.Profile;
     var spirit = Model.ChatHistory.CurrentSpirit;
     var spirits = Model.ChatHistory.Spirits;
     var messages = Model.ChatHistory.Messages;
-
     ViewData["FloatingCompanionName"] = spirit.Name;
     ViewData["FloatingCompanionImage"] = spirit.ImagePath;
     ViewData["FloatingCompanionAccent"] = spirit.AccentColor;
@@ -15,129 +14,9 @@
     ViewData["FloatingCompanionMood"] = profile.Mood;
     ViewData["FloatingCompanionLevel"] = profile.Level;
 }
-
 <div class="workbench-app" data-workbench-root style="--spirit-accent:@spirit.AccentColor">
-    <aside class="sidebar">
-        <partial name="Shared/_SidebarCollapseToggle" />
-        <div class="sidebar-body">
-            <div class="sidebar-brand-row brand-compact">
-                <div class="brand-avatar">灵</div>
-                <div class="brand-text">
-                    <h2>光合桌面</h2>
-                    <p>SpiritDesk</p>
-                </div>
-            </div>
-
-            <nav class="nav-menu">
-                <a class="nav-item" asp-page="/Index"><span class="nav-label">首页</span></a>
-                <a class="nav-item" asp-page="/Assistant"><span class="nav-label">助手</span></a>
-                <a class="nav-item active" asp-page="/Chat"><span class="nav-label">回顾</span></a>
-                <a class="nav-item" asp-page="/Settings"><span class="nav-label">设置</span></a>
-            </nav>
-
-            <section class="sidebar-section spirit-pool">
-                <div class="sidebar-title-row">
-                    <span>精灵球</span>
-                    <span class="tiny-badge">@spirits.Count</span>
-                </div>
-                <div class="mini-dock-wrap">
-                    <div class="mini-dock">
-                        @foreach (var item in spirits)
-                        {
-                            <div class="mini-ball @(item.Id == spirit.Id ? "active" : string.Empty)" style="--ball-accent:@item.AccentColor" title="@item.Name">
-                                <img src="@item.ImagePath" alt="@item.Name" />
-                            </div>
-                        }
-                    </div>
-                </div>
-            </section>
-        </div>
-    </aside>
-
-    <main class="main-workbench">
-        <section class="hero-head">
-            <div>
-                <h1>聊天回顾</h1>
-                <p>查看你和 <strong>@spirit.Name</strong> 的完整聊天记录，并继续发送新消息。</p>
-            </div>
-            <div class="hero-toolbar">
-                <a class="toolbar-pill active" asp-page="/Chat">全部记录</a>
-                <a class="toolbar-pill" asp-page="/Index">返回主页</a>
-            </div>
-        </section>
-
-        @if (!string.IsNullOrWhiteSpace(Model.NoticeMessage))
-        {
-            <div class="notice-banner">@Model.NoticeMessage</div>
-        }
-
-        <section class="chat-history-grid">
-            <section class="content-card chat-summary-card">
-                <div class="card-head">
-                    <div>
-                        <span class="card-kicker">统计</span>
-                        <h3>聊天概览</h3>
-                    </div>
-                    <span class="tiny-badge">@messages.Count</span>
-                </div>
-
-                <div class="task-overview-grid">
-                    <div class="task-overview-pill">
-                        <strong>@messages.Count</strong>
-                        <span>总消息数</span>
-                    </div>
-                    <div class="task-overview-pill">
-                        <strong>@Model.ChatHistory.UserMessageCount</strong>
-                        <span>@profile.Nickname</span>
-                    </div>
-                    <div class="task-overview-pill">
-                        <strong>@Model.ChatHistory.SpiritMessageCount</strong>
-                        <span>@spirit.Name</span>
-                    </div>
-                    <div class="task-overview-pill">
-                        <strong>@messages.LastOrDefault()?.CreatedAt.ToString("MM-dd")</strong>
-                        <span>最近互动</span>
-                    </div>
-                </div>
-
-                <form method="post" asp-page-handler="SendMessage" class="inline-task-form">
-                    <textarea asp-for="MessageText" class="soft-input" rows="4" placeholder="继续向 @spirit.Name 发送消息，例如：帮我总结一下今天的状态。"></textarea>
-                    <button type="submit" class="action-button purple">发送新消息</button>
-                </form>
-            </section>
-
-            <section class="content-card chat-history-card">
-                <div class="card-head">
-                    <div>
-                        <span class="card-kicker">History</span>
-                        <h3>完整聊天记录</h3>
-                    </div>
-                    <span class="tiny-badge">按时间顺序</span>
-                </div>
-
-                <div class="chat-timeline">
-                    @if (messages.Count == 0)
-                    {
-                        <div class="stack-item">
-                            <p>还没有聊天记录，先发送第一条消息吧。</p>
-                        </div>
-                    }
-                    else
-                    {
-                        @foreach (var message in messages)
-                        {
-                            var isUser = message.Sender == "user";
-                            <article class="history-message-row @(isUser ? "user" : "spirit")">
-                                <div class="history-message-meta">
-                                    <strong>@(isUser ? profile.Nickname : spirit.Name)</strong>
-                                    <span>@message.CreatedAt.ToString("yyyy-MM-dd HH:mm")</span>
-                                </div>
-                                <p>@message.Content</p>
-                            </article>
-                        }
-                    }
-                </div>
-            </section>
-        </section>
-    </main>
-</div>
+<aside class="sidebar"><partial name="Shared/_SidebarCollapseToggle" /><div class="sidebar-body"><div class="sidebar-brand-row brand-compact"><div class="brand-avatar">灵</div><div class="brand-text"><h2>光合桌面</h2><p>SpiritDesk</p></div></div><nav class="nav-menu"><a class="nav-item" asp-page="/Index"><span class="nav-label">首页 / 精灵主页</span></a><a class="nav-item active" asp-page="/Chat"><span class="nav-label">精灵聊天</span></a><a class="nav-item" asp-page="/Assistant"><span class="nav-label">任务助手</span></a><a class="nav-item" asp-page="/Settings"><span class="nav-label">精灵设置</span></a></nav><section class="sidebar-section spirit-pool"><div class="sidebar-title-row"><span>当前精灵池</span><span class="tiny-badge">@spirits.Count</span></div><div class="mini-dock-wrap"><div class="mini-dock">@foreach (var item in spirits){<div class="mini-ball @(item.Id == spirit.Id ? "active" : string.Empty)" style="--ball-accent:@item.AccentColor" title="@item.Name"><img src="@item.ImagePath" alt="@item.Name" /></div>}</div></div></section></div></aside>
+<main class="main-workbench"><section class="hero-head"><div><h1>精灵聊天</h1><p>查看与 <strong>@spirit.Name</strong> 的完整记录，并继续对话。</p></div><div class="hero-toolbar"><a class="toolbar-pill active" asp-page="/Chat">全部记录</a><a class="toolbar-pill" asp-page="/Index">返回精灵主页</a></div></section>
+@if (!string.IsNullOrWhiteSpace(Model.NoticeMessage)){<div class="notice-banner">@Model.NoticeMessage</div>}
+<section class="chat-history-grid"><section class="content-card chat-summary-card"><div class="card-head"><div><span class="card-kicker">统计</span><h3>聊天概览</h3></div><span class="tiny-badge">@messages.Count</span></div><div class="task-overview-grid"><div class="task-overview-pill"><strong>@messages.Count</strong><span>总消息数</span></div><div class="task-overview-pill"><strong>@Model.ChatHistory.UserMessageCount</strong><span>@profile.Nickname</span></div><div class="task-overview-pill"><strong>@Model.ChatHistory.SpiritMessageCount</strong><span>@spirit.Name</span></div><div class="task-overview-pill"><strong>@messages.LastOrDefault()?.CreatedAt.ToString("MM-dd")</strong><span>最近互动</span></div></div><form method="post" asp-page-handler="SendMessage" class="inline-task-form"><textarea asp-for="MessageText" class="soft-input" rows="4" placeholder="继续向 @spirit.Name 发送消息，例如：帮我总结一下今天的状态。"></textarea><button type="submit" class="action-button purple">发送消息</button></form></section>
+<section class="content-card chat-history-card"><div class="card-head"><div><span class="card-kicker">History</span><h3>完整聊天记录</h3></div><span class="tiny-badge">按时间顺序</span></div><div class="chat-timeline">@if (messages.Count == 0){<div class="stack-item"><p>还没有聊天记录，先发送第一条消息吧。</p></div>}else{@foreach (var message in messages){var isUser = message.Sender == "user";<article class="history-message-row @(isUser ? "user" : "spirit")"><div class="history-message-meta"><strong>@(isUser ? profile.Nickname : spirit.Name)</strong><span>@message.CreatedAt.ToString("yyyy-MM-dd HH:mm")</span></div><p>@message.Content</p></article>}}</div></section></section></main></div>
