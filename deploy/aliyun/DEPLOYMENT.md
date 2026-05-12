@@ -52,3 +52,73 @@ dotnet build SpiritDesk.sln
 dotnet run --project .\src\SpiritDesk.Web\SpiritDesk.Web.csproj
 dotnet run --project .\src\SpiritDesk.Shell\SpiritDesk.Shell.csproj
 ```
+
+## 6. 云端演示登录（可选）
+
+当站点暴露在公网时，可在 **不配数据库多用户** 的前提下启用「单账号 Cookie 登录」，用于答辩演示防扫。
+
+推荐用 **systemd 环境文件**（不把密码写进仓库）：
+
+1. 在服务器创建目录并复制示例（示例文件：`deploy/aliyun/spiritdesk.env.example`）：
+
+```bash
+sudo mkdir -p /etc/spiritdesk
+sudo nano /etc/spiritdesk/spiritdesk.env
+```
+
+2. 写入（键名勿改，值为你的账号密码）：
+
+```bash
+SpiritDesk__Auth__Enabled=true
+SpiritDesk__Auth__Username=你的用户名
+SpiritDesk__Auth__Password=你的强密码
+```
+
+3. 权限与重启：
+
+```bash
+sudo chmod 600 /etc/spiritdesk/spiritdesk.env
+sudo systemctl daemon-reload
+sudo systemctl restart spiritdesk-web
+```
+
+`deploy/systemd/spiritdesk-web.service` 已包含 `EnvironmentFile=-/etc/spiritdesk/spiritdesk.env`。
+
+若未配置 `Enabled=true` 或未同时填写用户名和密码，应用 **不要求登录**。
+
+- 登录页：`/Login`
+- 退出：精灵设置页底部「退出登录」
+
+## 7. 本地默认登录（Development）
+
+通过 **桌面壳** 或 **`dotnet run SpiritDesk.Web`** 且环境为 **Development** 时：
+
+- Shell 启动的子进程 Web 已强制 `ASPNETCORE_ENVIRONMENT=Development`，会合并 `appsettings.Development.json`。
+- 默认演示账号：**用户名 `spiritdesk`，密码 `spiritdesk`**（仅用于本机答辩演示，请勿用于公网）。
+
+生产环境（`ASPNETCORE_ENVIRONMENT=Production`）仍以 `appsettings.json` 为准，默认 **不启用** 登录，需在服务器用 §6 的环境变量开启。
+
+## 8. 发布到服务器（需你在本机/跳板机执行）
+
+我无法替你 SSH 登录阿里云；请在本机构建发布后上传。
+
+**Windows PowerShell（仓库根目录）：**
+
+```powershell
+.\deploy\scripts\publish-web.ps1
+```
+
+将输出的 `artifacts\spiritdesk-web-publish`（或脚本提示的路径）整体上传到服务器 Web 目录，例如：
+
+```powershell
+scp -r .\artifacts\spiritdesk-web-publish\* user@116.62.19.40:/opt/spiritdesk/web/
+```
+
+SSH 登录服务器后：
+
+```bash
+sudo systemctl restart spiritdesk-web
+sudo systemctl status spiritdesk-web --no-pager
+```
+
+确保已配置 §6 的 `/etc/spiritdesk/spiritdesk.env`，否则公网站点仍为匿名访问。

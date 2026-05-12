@@ -88,11 +88,32 @@ public static class DatabaseBootstrapper
                     return;
                 }
             }
+
+            EnsureWebAccountsTable(connection);
         }
         catch (Exception exception)
         {
             ResetDatabase(databasePath, $"schema validation failed: {exception.GetType().Name}");
         }
+    }
+
+    /// <summary>
+    /// 已有数据库不会由 EF EnsureCreated 补建新表，因此在校验通过后补建 WebAccounts（幂等）。
+    /// </summary>
+    private static void EnsureWebAccountsTable(SqliteConnection connection)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            CREATE TABLE IF NOT EXISTS "WebAccounts" (
+                "Id" INTEGER NOT NULL CONSTRAINT "PK_WebAccounts" PRIMARY KEY AUTOINCREMENT,
+                "Username" TEXT NOT NULL,
+                "PasswordHash" TEXT NOT NULL,
+                "CreatedAt" TEXT NOT NULL
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_WebAccounts_Username" ON "WebAccounts" ("Username");
+            """;
+        command.ExecuteNonQuery();
     }
 
     private static bool TableContainsColumns(

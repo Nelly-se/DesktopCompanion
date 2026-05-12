@@ -1,7 +1,12 @@
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using SpiritDesk.Core.Entities;
+using SpiritDesk.Web.Auth;
 using SpiritDesk.Web.Data;
 using SpiritDesk.Web.Helpers;
 using SpiritDesk.Web.Models;
@@ -43,7 +48,42 @@ public static class SpiritDeskWebHost
         var databasePath = Path.Combine(dataDirectory, "spiritdesk.db");
         DatabaseBootstrapper.EnsureCompatibleDatabase(databasePath);
 
-        builder.Services.AddRazorPages();
+        var authEnabled = SpiritDeskAuthHelper.IsDemoAuthEnabled(builder.Configuration);
+
+        builder.Services.AddRazorPages(options =>
+        {
+            if (authEnabled)
+            {
+                options.Conventions.AuthorizeFolder("/");
+                options.Conventions.AllowAnonymousToPage("/Login");
+                options.Conventions.AllowAnonymousToPage("/Register");
+                options.Conventions.AllowAnonymousToPage("/Logout");
+                options.Conventions.AllowAnonymousToPage("/Error");
+                options.Conventions.AllowAnonymousToPage("/Privacy");
+            }
+        });
+
+        if (authEnabled)
+        {
+            builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+                .AddCookie(options =>
+                {
+                    options.LoginPath = "/Login";
+                    options.LogoutPath = "/Logout";
+                    options.AccessDeniedPath = "/Login";
+                    options.SlidingExpiration = true;
+                    options.ExpireTimeSpan = TimeSpan.FromHours(12);
+                    options.Cookie.Name = "SpiritDesk.Auth";
+                    options.Cookie.HttpOnly = true;
+                    options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+                    options.Cookie.SameSite = SameSiteMode.Lax;
+                });
+        }
+
+        builder.Services.AddAuthorization();
+
+        builder.Services.AddSingleton<IPasswordHasher<WebAccount>, PasswordHasher<WebAccount>>();
+
         builder.Services.AddHealthChecks()
             .AddDbContextCheck<SpiritDeskDbContext>("sqlite");
         builder.Services
@@ -69,11 +109,16 @@ public static class SpiritDeskWebHost
         });
         app.UseRouting();
         app.UseStaticFiles();
+        if (authEnabled)
+        {
+            app.UseAuthentication();
+        }
+
         app.UseAuthorization();
         app.MapRazorPages();
-        app.MapHealthChecks("/healthz");
+        app.MapHealthChecks("/healthz").AllowAnonymous();
 
-        app.MapGet("/api/companion/state", async (SpiritDeskService spiritDeskService) =>
+        var companionState = app.MapGet("/api/companion/state", async (SpiritDeskService spiritDeskService) =>
         {
             await spiritDeskService.EnsureInitializedAsync();
             var spirits = await spiritDeskService.GetSpiritsAsync();
@@ -99,8 +144,12 @@ public static class SpiritDeskWebHost
                 spirits = list
             });
         });
+        if (authEnabled)
+        {
+            companionState.RequireAuthorization();
+        }
 
-        app.MapPost("/api/companion/select-spirit", async ([FromBody] CompanionSelectBody? body, SpiritDeskService spiritDeskService) =>
+        var companionSelect = app.MapPost("/api/companion/select-spirit", async ([FromBody] CompanionSelectBody? body, SpiritDeskService spiritDeskService) =>
         {
             if (body is null || string.IsNullOrWhiteSpace(body.SpiritId))
             {
@@ -112,8 +161,12 @@ public static class SpiritDeskWebHost
                 ? Results.Ok(new { message = result.Message })
                 : Results.BadRequest(new { message = result.Message });
         });
+        if (authEnabled)
+        {
+            companionSelect.RequireAuthorization();
+        }
 
-        app.MapGet("/api/companion/current", async (SpiritDeskService spiritDeskService, SpiritPersonaService personaService) =>
+        var companionCurrent = app.MapGet("/api/companion/current", async (SpiritDeskService spiritDeskService, SpiritPersonaService personaService) =>
         {
             try
             {
@@ -170,6 +223,10 @@ public static class SpiritDeskWebHost
                 });
             }
         });
+        if (authEnabled)
+        {
+            companionCurrent.RequireAuthorization();
+        }
 
         return app;
     }

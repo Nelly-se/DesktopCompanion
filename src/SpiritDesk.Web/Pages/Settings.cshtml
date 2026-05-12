@@ -1,18 +1,11 @@
 ﻿@page
 @model SpiritDesk.Web.Pages.SettingsModel
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
 @{
     ViewData["Title"] = "精灵设置";
     var profile = Model.Settings.Profile;
     var currentSpirit = Model.Settings.CurrentSpirit;
     var spirits = Model.Settings.Spirits;
-
-    ViewData["FloatingCompanionName"] = currentSpirit.Name;
-    ViewData["FloatingCompanionImage"] = currentSpirit.ImagePath;
-    ViewData["FloatingCompanionAccent"] = currentSpirit.AccentColor;
-    ViewData["FloatingCompanionTitle"] = currentSpirit.Title;
-    ViewData["FloatingCompanionGreeting"] = "设置页也会同步你的当前精灵状态。";
-    ViewData["FloatingCompanionMood"] = profile.Mood;
-    ViewData["FloatingCompanionLevel"] = profile.Level;
 }
 <div class="workbench-app" data-workbench-root style="--spirit-accent:@currentSpirit.AccentColor">
 <aside class="sidebar"><partial name="Shared/_SidebarCollapseToggle" /><div class="sidebar-body"><div class="sidebar-brand-row brand-compact"><div class="brand-avatar">灵</div><div class="brand-text"><h2>光合桌面</h2><p>SpiritDesk</p></div></div><nav class="nav-menu"><a class="nav-item" asp-page="/Index"><span class="nav-label">首页 / 精灵主页</span></a><a class="nav-item" asp-page="/Chat"><span class="nav-label">精灵聊天</span></a><a class="nav-item" asp-page="/Assistant"><span class="nav-label">任务助手</span></a><a class="nav-item active" asp-page="/Settings"><span class="nav-label">精灵设置</span></a></nav></div></aside>
@@ -21,4 +14,8 @@
 <section class="settings-grid"><section class="content-card settings-profile-card"><div class="card-head"><div><span class="card-kicker">档案</span><h3>本地用户档案</h3></div><span class="tiny-badge">Local</span></div><div class="settings-stat-grid"><div class="task-overview-pill"><strong>@profile.Mood</strong><span>心情值</span></div><div class="task-overview-pill"><strong>@profile.Affinity</strong><span>亲密度</span></div><div class="task-overview-pill"><strong>@profile.Level</strong><span>等级</span></div><div class="task-overview-pill"><strong>@profile.Coins</strong><span>金币</span></div></div><form method="post" asp-page-handler="Rename" class="inline-task-form"><label asp-for="Nickname">昵称</label><input asp-for="Nickname" class="soft-input" value="@profile.Nickname" maxlength="24" placeholder="输入新的昵称" /><button type="submit" class="action-button green">保存昵称</button></form></section>
 <section class="content-card settings-spirit-card"><div class="card-head"><div><span class="card-kicker">当前精灵</span><h3>@currentSpirit.Name</h3></div><span class="tiny-badge">@currentSpirit.CoreRole</span></div><div class="settings-spirit-stage"><div class="compact-orb"><img src="@currentSpirit.ImagePath" alt="@currentSpirit.Name" /></div><div class="settings-spirit-copy"><p><strong>称号：</strong>@currentSpirit.Title</p><p><strong>MBTI：</strong>@currentSpirit.Mbti</p><p><strong>元素：</strong>@currentSpirit.ElementType</p><p><strong>性格：</strong>@currentSpirit.Personality</p><p><strong>核心机制：</strong>@currentSpirit.SpecialMechanism</p></div></div></section></section>
 <section class="content-card settings-switch-card"><div class="card-head"><div><span class="card-kicker">精灵切换</span><h3>选择陪伴精灵</h3></div><span class="tiny-badge">即时生效</span></div><div class="settings-cooldown-banner"><p>@Model.Settings.CooldownMessage</p></div><div class="settings-spirit-grid">@foreach (var spirit in spirits){var isCurrent = spirit.Id == currentSpirit.Id;<article class="settings-spirit-option @(isCurrent ? "current" : string.Empty)" style="--ball-accent:@spirit.AccentColor"><div class="settings-spirit-head"><img src="@spirit.ImagePath" alt="@spirit.Name" class="settings-spirit-thumb" /><div><h4>@spirit.Name</h4><p>@spirit.Title</p></div></div><p class="settings-spirit-description">@spirit.Description</p><div class="settings-spirit-meta"><span>@spirit.Mbti</span><span>@spirit.CoreRole</span></div>@if (isCurrent){<span class="status-chip done">当前精灵</span>}else{<form method="post" asp-page-handler="SelectSpirit"><input type="hidden" asp-for="SpiritId" value="@spirit.Id" /><button type="submit" class="choose-button">切换为 @spirit.Name</button></form>}</article>}</div></section>
+@if (SpiritDeskAuthHelper.IsDemoAuthEnabled(Configuration) && User.Identity?.IsAuthenticated == true)
+{
+<section class="content-card settings-session-card"><div class="card-head"><div><span class="card-kicker">会话</span><h3>云端登录</h3></div></div><p class="settings-session-lead">当前已通过演示账号登录；退出后需要重新输入用户名和密码。</p><form method="post" asp-page="/Logout"><button type="submit" class="action-button white settings-logout-btn">退出登录</button></form></section>
+}
 </main></div>

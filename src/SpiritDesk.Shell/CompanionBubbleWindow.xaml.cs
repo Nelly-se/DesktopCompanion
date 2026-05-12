@@ -2,12 +2,14 @@
 using System.IO;
 using System.Net.Http;
 using System.Net.Http.Json;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using SpiritDesk.Core.Constants;
 
 namespace SpiritDesk.Shell;
 
@@ -15,11 +17,11 @@ public partial class CompanionBubbleWindow : Window
 {
     private const double CollapsedSize = 88;
     private const double DefaultExpandedWidth = 320;
-    private const double DefaultExpandedHeight = 220;
+    private const double DefaultExpandedHeight = 210;
     private const double MinExpandedWidth = 320;
-    private const double MinExpandedHeight = 220;
+    private const double MinExpandedHeight = 240;
     private const double MaxExpandedWidth = 420;
-    private const double MaxExpandedHeight = 260;
+    private const double MaxExpandedHeight = 320;
 
     private static readonly CompanionStatusDto DefaultStatus = new()
     {
@@ -39,6 +41,7 @@ public partial class CompanionBubbleWindow : Window
     private readonly Window _mainWindow;
     private readonly ShellSettingsService _settingsService = new();
     private readonly DispatcherTimer _singleClickTimer;
+    private readonly DispatcherTimer _pollTimer;
     private readonly string _logFilePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "SpiritDesk",
@@ -51,8 +54,22 @@ public partial class CompanionBubbleWindow : Window
     private double _panelWidth = DefaultExpandedWidth;
     private double _panelHeight = DefaultExpandedHeight;
     private string _theme = "mint";
-    private string _lastImageUrl = string.Empty;
     private CompanionStatusDto _status = DefaultStatus;
+
+    // 内置五种精灵（与 SpiritDesk.Web 一致），右键菜单不请求 /api/companion/state。
+    private static readonly (string Id, string DisplayName)[] BuiltInSpiritPickers =
+    [
+        (SpiritIds.Light, "卷卷晴"),
+        (SpiritIds.Water, "嘻嘻滴"),
+        (SpiritIds.Air, "贴贴朵"),
+        (SpiritIds.Soil, "慢慢壤"),
+        (SpiritIds.Nutrition, "新新星"),
+    ];
+
+    private static readonly JsonSerializerOptions ApiJsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
 
     public CompanionBubbleWindow(Uri baseUri, HttpClient httpClient, Window mainWindow)
     {
@@ -60,7 +77,7 @@ public partial class CompanionBubbleWindow : Window
         _baseUri = baseUri;
         _httpClient = httpClient;
         _mainWindow = mainWindow;
-        ToolTip = "SpiritDesk 桌面浮球：单击展开，双击打开主窗口";
+        ToolTip = "SpiritDesk 桌面浮球：单击展开，双击打开主窗口，右键菜单直接选择精灵";
 
         _singleClickTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(230) };
         _singleClickTimer.Tick += (_, _) =>
@@ -68,6 +85,9 @@ public partial class CompanionBubbleWindow : Window
             _singleClickTimer.Stop();
             ToggleExpanded();
         };
+
+        _pollTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(12) };
+        _pollTimer.Tick += (_, _) => _ = PollTickAsync();
 
         Log("CompanionBubbleWindow constructed.");
 
@@ -78,9 +98,14 @@ public partial class CompanionBubbleWindow : Window
             RestoreWindowState();
             ApplyStatus(_status);
             await RefreshStatusAsync();
+            _pollTimer.Start();
             _isInitializing = false;
         };
-        Closing += (_, _) => SaveWindowState();
+        Closing += (_, _) =>
+        {
+            _pollTimer.Stop();
+            SaveWindowState();
+        };
     }
 
     private void PositionAtPrimaryWorkAreaBottomRight()
@@ -159,6 +184,82 @@ public partial class CompanionBubbleWindow : Window
     }
 
     private void OpenSpiritDeskMenuItem_Click(object sender, RoutedEventArgs e) => OpenMainWindow();
+
+    private void CompanionContextMenu_Opened(object sender, RoutedEventArgs e)
+    {
+        if (sender is not ContextMenu cm)
+        {
+            return;
+        }
+
+        cm.Items.Clear();
+        var current = (_status?.Name ?? string.Empty).Trim();
+        foreach (var (id, displayName) in BuiltInSpiritPickers)
+        {
+            var sid = id.Trim();
+            var isCurrent = !string.IsNullOrEmpty(current)
+                && string.Equals(current, displayName, StringComparison.OrdinalIgnoreCase);
+            var mi = new MenuItem
+            {
+                Header = isCurrent ? $"{displayName}（当前 ✓）" : displayName,
+                Tag = sid
+            };
+            mi.Click += SpiritSwitchPickMenuItem_Click;
+            cm.Items.Add(mi);
+        }
+
+        cm.Items.Add(new Separator());
+        AppendStaticCompanionMenuItems(cm);
+    }
+
+    private void AppendStaticCompanionMenuItems(ContextMenu cm)
+    {
+        cm.Items.Add(MenuLink("打开 SpiritDesk", OpenSpiritDeskMenuItem_Click));
+        cm.Items.Add(MenuLink("重置位置", ResetPositionMenuItem_Click));
+        cm.Items.Add(MenuLink(_theme == "warm" ? "切换到薄荷主题" : "切换到暖色主题", ToggleThemeMenuItem_Click));
+        cm.Items.Add(MenuLink(Topmost ? "取消置顶" : "置顶", ToggleTopmostMenuItem_Click));
+        cm.Items.Add(new Separator());
+        cm.Items.Add(MenuLink("退出", ExitMenuItem_Click));
+    }
+
+    private static MenuItem MenuLink(string header, RoutedEventHandler handler)
+    {
+        var mi = new MenuItem { Header = header };
+        mi.Click += handler;
+        return mi;
+    }
+
+    private async void SpiritSwitchPickMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem mi || mi.Tag is not string sid || string.IsNullOrWhiteSpace(sid))
+        {
+            return;
+        }
+
+        await SelectSpiritAsync(sid).ConfigureAwait(false);
+        if (Application.Current.Dispatcher.CheckAccess())
+        {
+            TryCloseContextMenu(mi);
+        }
+        else
+        {
+            await Application.Current.Dispatcher.InvokeAsync(() => TryCloseContextMenu(mi));
+        }
+    }
+
+    private static void TryCloseContextMenu(MenuItem mi)
+    {
+        var parent = mi.Parent;
+        while (parent is MenuItem parentMi)
+        {
+            parent = parentMi.Parent;
+        }
+
+        if (parent is ContextMenu ctx)
+        {
+            ctx.IsOpen = false;
+        }
+    }
 
     private void ResetPositionMenuItem_Click(object sender, RoutedEventArgs e)
     {
@@ -260,7 +361,7 @@ public partial class CompanionBubbleWindow : Window
         SetWindowSizeKeepBottomRight(_panelWidth, _panelHeight);
         EnsureInsideWorkArea();
         SaveWindowState();
-        _ = RefreshStatusAsync();
+        _ = ExpandRefreshAsync();
     }
 
     private void Collapse()
@@ -315,7 +416,7 @@ public partial class CompanionBubbleWindow : Window
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(4));
             var endpoint = new Uri(_baseUri, "/api/companion/current");
             Log($"Companion API URL: {endpoint}");
-            var dto = await _httpClient.GetFromJsonAsync<CompanionStatusDto>(endpoint, cts.Token);
+            var dto = await _httpClient.GetFromJsonAsync<CompanionStatusDto>(endpoint, ApiJsonOptions, cts.Token);
             if (dto is null)
             {
                 Log("Companion API returned null payload.");
@@ -329,6 +430,59 @@ public partial class CompanionBubbleWindow : Window
         catch (Exception ex)
         {
             Log($"Companion API failed: {ex.GetType().Name}: {ex.Message}");
+        }
+    }
+
+    public void NotifyHostActivated()
+    {
+        _ = HostFocusRefreshAsync();
+    }
+
+    private async Task HostFocusRefreshAsync()
+    {
+        await RefreshStatusAsync();
+    }
+
+    private async Task ExpandRefreshAsync()
+    {
+        await RefreshStatusAsync();
+    }
+
+    private async Task PollTickAsync()
+    {
+        try
+        {
+            await RefreshStatusAsync();
+        }
+        catch (Exception ex)
+        {
+            Log($"Poll tick failed: {ex.Message}");
+        }
+    }
+
+    private async Task SelectSpiritAsync(string spiritId)
+    {
+        if (string.IsNullOrWhiteSpace(spiritId))
+        {
+            return;
+        }
+
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(12));
+            var uri = new Uri(_baseUri, "/api/companion/select-spirit");
+            using var response = await _httpClient.PostAsJsonAsync(uri, new { spiritId = spiritId.Trim() }, ApiJsonOptions, cts.Token).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+            {
+                Log($"Select spirit HTTP {(int)response.StatusCode}");
+                return;
+            }
+
+            await RefreshStatusAsync();
+        }
+        catch (Exception ex)
+        {
+            Log($"Select spirit error: {ex.Message}");
         }
     }
 
@@ -359,72 +513,65 @@ public partial class CompanionBubbleWindow : Window
         _ = ApplySpiritImageAsync(dto.ImageUrl);
     }
 
+    private async Task<BitmapImage?> LoadSpiritBitmapAsync(string imageUrl)
+    {
+        try
+        {
+            var imageUri = BuildImageUri(imageUrl);
+            var bytes = await _httpClient.GetByteArrayAsync(imageUri).ConfigureAwait(false);
+            using var ms = new MemoryStream(bytes);
+            var bitmap = new BitmapImage();
+            bitmap.BeginInit();
+            bitmap.CacheOption = BitmapCacheOption.OnLoad;
+            bitmap.StreamSource = ms;
+            bitmap.EndInit();
+            bitmap.Freeze();
+            return bitmap;
+        }
+        catch (Exception ex)
+        {
+            Log($"LoadSpiritBitmapAsync failed: {ex.Message}");
+            return null;
+        }
+    }
+
     private async Task ApplySpiritImageAsync(string imageUrl)
     {
-        var stage = "init";
         Log($"ApplySpiritImageAsync called. rawImageUrl={imageUrl}");
 
         if (string.IsNullOrWhiteSpace(imageUrl))
         {
             Log("Image URL empty, showing fallback glyph.");
-            ShowFallbackGlyph();
-            return;
-        }
-
-        if (imageUrl == _lastImageUrl)
-        {
-            Log("Image URL unchanged, skip reloading.");
+            await Dispatcher.InvokeAsync(ShowFallbackGlyph);
             return;
         }
 
         try
         {
-            stage = "resolve-url";
-            var imageUri = BuildImageUri(imageUrl);
-            Log($"Resolved fullImageUrl={imageUri}");
-            stage = "download-start";
-            Log("Start downloading image bytes.");
-            var bytes = await _httpClient.GetByteArrayAsync(imageUri);
-            stage = "download-success";
-            Log($"Image bytes downloaded. size={bytes.Length}");
-
-            BitmapImage bitmap;
-            stage = "bitmap-create-start";
-            Log("Stage 2: bitmap create start.");
-            using (var ms = new MemoryStream(bytes))
+            var bitmap = await LoadSpiritBitmapAsync(imageUrl).ConfigureAwait(false);
+            if (bitmap is null)
             {
-                bitmap = new BitmapImage();
-                bitmap.BeginInit();
-                bitmap.CacheOption = BitmapCacheOption.OnLoad;
-                bitmap.StreamSource = ms;
-                bitmap.EndInit();
-                bitmap.Freeze();
+                await Dispatcher.InvokeAsync(ShowFallbackGlyph);
+                return;
             }
-            stage = "bitmap-create-success";
-            Log("Stage 2: bitmap create success.");
 
-            stage = "ui-apply-start";
-            Log("Stage 3: apply UI start.");
-            BubbleSpiritImage.Source = bitmap;
-            PanelSpiritImage.Source = bitmap;
-            stage = "ui-source-assigned";
-            Log("Stage 3: image source assigned.");
-            BubbleSpiritImage.Visibility = Visibility.Visible;
-            PanelSpiritImage.Visibility = Visibility.Visible;
-            BubbleFallbackView.Visibility = Visibility.Collapsed;
-            AvatarFallbackView.Visibility = Visibility.Collapsed;
-            BubbleFallbackText.Visibility = Visibility.Collapsed;
-            PanelFallbackText.Visibility = Visibility.Collapsed;
-            stage = "ui-fallback-collapsed";
-            Log("Stage 3: fallback collapsed.");
-            _lastImageUrl = imageUrl;
-            stage = "done";
-            Log("Image load success. Image Visible; fallback text Collapsed.");
+            await Dispatcher.InvokeAsync(() =>
+            {
+                BubbleSpiritImage.Source = bitmap;
+                PanelSpiritImage.Source = bitmap;
+                BubbleSpiritImage.Visibility = Visibility.Visible;
+                PanelSpiritImage.Visibility = Visibility.Visible;
+                BubbleFallbackView.Visibility = Visibility.Collapsed;
+                AvatarFallbackView.Visibility = Visibility.Collapsed;
+                BubbleFallbackText.Visibility = Visibility.Collapsed;
+                PanelFallbackText.Visibility = Visibility.Collapsed;
+                Log("ApplySpiritImageAsync UI applied.");
+            });
         }
         catch (Exception ex)
         {
-            Log($"Image load failed at stage '{stage}': {ex.GetType().Name}: {ex.Message}");
-            ShowFallbackGlyph();
+            Log($"ApplySpiritImageAsync failed: {ex.GetType().Name}: {ex.Message}");
+            await Dispatcher.InvokeAsync(ShowFallbackGlyph);
         }
     }
 
@@ -553,7 +700,7 @@ public partial class CompanionBubbleWindow : Window
 
     private void SyncTopmostMenuHeader()
     {
-        ToggleTopmostMenuItem.Header = Topmost ? "取消置顶" : "置顶";
+        /* 置顶文案在每次打开右键菜单时根据 Topmost 动态生成 */
     }
 
     private void ApplyTheme()
@@ -566,7 +713,6 @@ public partial class CompanionBubbleWindow : Window
             PanelView.BorderBrush = ToBrush("#F2C8A1");
             AvatarBorder.Background = ToBrush("#FDE7D3");
             AvatarBorder.BorderBrush = ToBrush("#EDBE91");
-            ToggleThemeMenuItem.Header = "切换到薄荷主题";
             return;
         }
 
@@ -576,7 +722,6 @@ public partial class CompanionBubbleWindow : Window
         PanelView.BorderBrush = ToBrush("#BFE5CF");
         AvatarBorder.Background = ToBrush("#E6F4EC");
         AvatarBorder.BorderBrush = ToBrush("#B8DFC9");
-        ToggleThemeMenuItem.Header = "切换到暖色主题";
     }
 
     private static Brush ToBrush(string hex)

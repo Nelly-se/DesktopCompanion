@@ -42,6 +42,7 @@ public partial class MainWindow : Window
             Browser.Source = new Uri(baseUrl);
 
             _companionBubble = new CompanionBubbleWindow(new Uri(baseUrl), _httpClient, this);
+            Activated += OnMainWindowActivated;
             _companionBubble.Show();
         }
         catch (Exception ex)
@@ -59,6 +60,8 @@ public partial class MainWindow : Window
     {
         _companionBubble?.Close();
         _companionBubble = null;
+
+        Activated -= OnMainWindowActivated;
 
         _httpClient.Dispose();
 
@@ -82,6 +85,11 @@ public partial class MainWindow : Window
         }
     }
 
+    private void OnMainWindowActivated(object? sender, EventArgs e)
+    {
+        _companionBubble?.NotifyHostActivated();
+    }
+
     private static string ResolveWebProjectRoot()
     {
         var current = new DirectoryInfo(AppContext.BaseDirectory);
@@ -101,7 +109,11 @@ public partial class MainWindow : Window
 
     private static string ResolveWebEntryAssembly(string webProjectRoot)
     {
+#if DEBUG
+        var configurations = new[] { "Debug", "Release" };
+#else
         var configurations = new[] { "Release", "Debug" };
+#endif
         foreach (var configuration in configurations)
         {
             var outputDirectory = Path.Combine(webProjectRoot, "bin", configuration, "net9.0");
@@ -128,6 +140,9 @@ public partial class MainWindow : Window
             RedirectStandardOutput = true,
             RedirectStandardError = true
         };
+
+        // 与「dotnet run SpiritDesk.Web」一致使用 Development，便于加载 appsettings.Development.json（含本地演示登录等）
+        startInfo.Environment["ASPNETCORE_ENVIRONMENT"] = "Development";
 
         var process = Process.Start(startInfo);
         if (process is null)

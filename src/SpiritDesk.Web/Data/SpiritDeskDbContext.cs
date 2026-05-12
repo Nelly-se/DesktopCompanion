@@ -7,6 +7,7 @@ namespace SpiritDesk.Web.Data;
 public class SpiritDeskDbContext(DbContextOptions<SpiritDeskDbContext> options) : DbContext(options)
 {
     public DbSet<UserProfile> UserProfiles => Set<UserProfile>();
+    public DbSet<WebAccount> WebAccounts => Set<WebAccount>();
     public DbSet<SpiritDefinition> Spirits => Set<SpiritDefinition>();
     public DbSet<TaskItem> Tasks => Set<TaskItem>();
     public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
@@ -14,6 +15,14 @@ public class SpiritDeskDbContext(DbContextOptions<SpiritDeskDbContext> options) 
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<WebAccount>(entity =>
+        {
+            entity.HasKey(x => x.Id);
+            entity.HasIndex(x => x.Username).IsUnique();
+            entity.Property(x => x.Username).HasMaxLength(64).IsRequired();
+            entity.Property(x => x.PasswordHash).HasMaxLength(500).IsRequired();
+        });
+
         modelBuilder.Entity<SpiritDefinition>().HasKey(x => x.Id);
         modelBuilder.Entity<DailyActionLog>().Property(x => x.ActionDate).HasConversion(
             value => value.ToDateTime(TimeOnly.MinValue),

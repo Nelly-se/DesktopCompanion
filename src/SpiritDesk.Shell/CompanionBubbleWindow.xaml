@@ -14,14 +14,8 @@
         MouseDoubleClick="Bubble_MouseDoubleClick"
         SizeChanged="Window_SizeChanged">
     <Window.ContextMenu>
-        <ContextMenu>
-            <MenuItem Header="打开 SpiritDesk" Click="OpenSpiritDeskMenuItem_Click" />
-            <MenuItem Header="重置位置" Click="ResetPositionMenuItem_Click" />
-            <MenuItem x:Name="ToggleThemeMenuItem" Header="切换到暖色主题" Click="ToggleThemeMenuItem_Click" />
-            <MenuItem x:Name="ToggleTopmostMenuItem" Header="取消置顶" Click="ToggleTopmostMenuItem_Click" />
-            <Separator />
-            <MenuItem Header="退出" Click="ExitMenuItem_Click" />
-        </ContextMenu>
+        <ContextMenu x:Name="CompanionContextMenu"
+                     Opened="CompanionContextMenu_Opened" />
     </Window.ContextMenu>
 
     <Grid x:Name="RootDragArea"

@@ -1,0 +1,43 @@
+@page
+@model SpiritDesk.Web.Pages.LoginModel
+
+<div class="login-shell">
+    <div class="login-card content-card">
+        <div class="login-brand">
+            <div class="brand-avatar">灵</div>
+            <div>
+                <p class="login-kicker">光合桌面</p>
+                <h1 class="login-title">SpiritDesk</h1>
+                <p class="login-lead">云端演示入口 · 登录后继续</p>
+            </div>
+        </div>
+
+        @if (TempData["LoginNotice"] is string loginNotice && !string.IsNullOrWhiteSpace(loginNotice))
+        {
+            <div class="notice-banner login-success">@loginNotice</div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(Model.ErrorMessage))
+        {
+            <div class="notice-banner login-error">@Model.ErrorMessage</div>
+        }
+
+        <form method="post" class="login-form">
+            <input type="hidden" asp-for="ReturnUrl" />
+            <label asp-for="Username" class="balance-label">用户名</label>
+            <input asp-for="Username" class="soft-input" autocomplete="username" required />
+
+            <label asp-for="Password" class="balance-label login-gap">密码</label>
+            <input asp-for="Password" type="password" class="soft-input" autocomplete="current-password" required />
+
+            <button type="submit" class="action-button mint login-submit">登录</button>
+        </form>
+
+        @if (Model.ShowRegisterLink)
+        {
+            <p class="login-register-hint text-center mt-3 mb-0">
+                <a asp-page="/Register">没有账号？注册</a>
+            </p>
+        }
+    </div>
+</div>

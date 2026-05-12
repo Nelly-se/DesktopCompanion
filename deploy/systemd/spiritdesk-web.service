@@ -14,6 +14,7 @@ Group=www-data
 Environment=ASPNETCORE_ENVIRONMENT=Production
 Environment=ASPNETCORE_URLS=http://127.0.0.1:8080
 Environment=SpiritDesk__DataDirectory=/opt/spiritdesk/data
+EnvironmentFile=-/etc/spiritdesk/spiritdesk.env
 
 [Install]
 WantedBy=multi-user.target

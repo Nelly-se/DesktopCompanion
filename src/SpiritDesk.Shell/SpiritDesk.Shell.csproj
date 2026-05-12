@@ -2,6 +2,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SpiritDesk.Core\SpiritDesk.Core.csproj" />
+    <!-- 保证 dotnet run Shell 时总会重新编译 Web；否则会长期用到旧的 SpiritDesk.Web.dll（页面仍是旧版） -->
+    <ProjectReference Include="..\SpiritDesk.Web\SpiritDesk.Web.csproj" />
   </ItemGroup>
 
   <ItemGroup>
