@@ -1259,6 +1259,8 @@ form {
 
 .chat-live-card .task-overview-pill span {
   font-size: 12px;
+  line-height: 1.35;
+  word-break: break-word;
 }
 
 .chat-timeline {
@@ -1614,8 +1616,27 @@ form {
   gap: 16px;
 }
 
+.chat-sidebar-head > div {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
 .chat-sidebar-head h3 {
   margin: 0;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.chat-sidebar-head .card-kicker {
+  margin-bottom: 0;
+  line-height: 1;
+}
+
+.chat-sidebar-head .tiny-badge {
+  flex: 0 0 auto;
+  align-self: flex-start;
 }
 
 .chat-sidebar-head p,
@@ -1623,6 +1644,7 @@ form {
   margin: 4px 0 0;
   color: var(--text-soft);
   line-height: 1.5;
+  word-break: break-word;
 }
 
 .chat-link {
@@ -1698,9 +1720,21 @@ form {
 .chat-live-meta {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
   gap: 10px;
   font-size: 12px;
   color: var(--text-soft);
+}
+
+.chat-live-meta strong {
+  min-width: 0;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.chat-live-meta span {
+  flex: 0 0 auto;
 }
 
 .chat-live-bubble {
