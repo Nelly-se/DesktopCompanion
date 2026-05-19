@@ -41,7 +41,11 @@ public partial class MainWindow : Window
             await Browser.EnsureCoreWebView2Async();
             Browser.Source = new Uri(baseUrl);
 
-            _companionBubble = new CompanionBubbleWindow(new Uri(baseUrl), _httpClient, this);
+            _companionBubble = new CompanionBubbleWindow(
+                new Uri(baseUrl),
+                _httpClient,
+                this,
+                () => BuildAuthCookieHeaderAsync(baseUrl));
             Activated += OnMainWindowActivated;
             _companionBubble.Show();
         }
@@ -109,19 +113,16 @@ public partial class MainWindow : Window
 
     private static string ResolveWebEntryAssembly(string webProjectRoot)
     {
-#if DEBUG
-        var configurations = new[] { "Debug", "Release" };
-#else
-        var configurations = new[] { "Release", "Debug" };
-#endif
-        foreach (var configuration in configurations)
+        var candidates = new[] { "Release", "Debug" }
+            .Select(configuration => Path.Combine(webProjectRoot, "bin", configuration, "net9.0", "SpiritDesk.Web.dll"))
+            .Where(File.Exists)
+            .Select(path => new FileInfo(path))
+            .OrderByDescending(file => file.LastWriteTimeUtc)
+            .ToList();
+
+        if (candidates.Count > 0)
         {
-            var outputDirectory = Path.Combine(webProjectRoot, "bin", configuration, "net9.0");
-            var entryAssemblyPath = Path.Combine(outputDirectory, "SpiritDesk.Web.dll");
-            if (File.Exists(entryAssemblyPath))
-            {
-                return entryAssemblyPath;
-            }
+            return candidates[0].FullName;
         }
 
         throw new FileNotFoundException(
@@ -141,8 +142,10 @@ public partial class MainWindow : Window
             RedirectStandardError = true
         };
 
-        // 与「dotnet run SpiritDesk.Web」一致使用 Development，便于加载 appsettings.Development.json（含本地演示登录等）
+        // 本地桌面模式仍使用 Development，便于加载 .env / 本地配置；
+        // 但桌面壳自带的是单机本地 Web，不再要求额外登录。
         startInfo.Environment["ASPNETCORE_ENVIRONMENT"] = "Development";
+        startInfo.Environment["SpiritDesk__Auth__Enabled"] = "false";
 
         var process = Process.Start(startInfo);
         if (process is null)
@@ -205,5 +208,28 @@ public partial class MainWindow : Window
         var port = ((IPEndPoint)listener.LocalEndpoint).Port;
         listener.Stop();
         return port;
+    }
+
+    private async Task<string?> BuildAuthCookieHeaderAsync(string baseUrl)
+    {
+        if (Browser.CoreWebView2 is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            var cookies = await Browser.CoreWebView2.CookieManager.GetCookiesAsync(baseUrl);
+            var authPairs = cookies
+                .Where(static cookie => string.Equals(cookie.Name, "SpiritDesk.Auth", StringComparison.Ordinal))
+                .Select(static cookie => $"{cookie.Name}={cookie.Value}")
+                .ToList();
+
+            return authPairs.Count == 0 ? null : string.Join("; ", authPairs);
+        }
+        catch
+        {
+            return null;
+        }
     }
 }

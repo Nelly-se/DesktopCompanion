@@ -2,6 +2,7 @@
 using System.IO;
 using System.Net.Http;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
@@ -17,11 +18,11 @@ public partial class CompanionBubbleWindow : Window
 {
     private const double CollapsedSize = 88;
     private const double DefaultExpandedWidth = 320;
-    private const double DefaultExpandedHeight = 210;
+    private const double DefaultExpandedHeight = 360;
     private const double MinExpandedWidth = 320;
-    private const double MinExpandedHeight = 240;
+    private const double MinExpandedHeight = 320;
     private const double MaxExpandedWidth = 420;
-    private const double MaxExpandedHeight = 320;
+    private const double MaxExpandedHeight = 480;
 
     private static readonly CompanionStatusDto DefaultStatus = new()
     {
@@ -39,6 +40,7 @@ public partial class CompanionBubbleWindow : Window
     private readonly Uri _baseUri;
     private readonly HttpClient _httpClient;
     private readonly Window _mainWindow;
+    private readonly Func<Task<string?>>? _cookieHeaderProvider;
     private readonly ShellSettingsService _settingsService = new();
     private readonly DispatcherTimer _singleClickTimer;
     private readonly DispatcherTimer _pollTimer;
@@ -71,12 +73,13 @@ public partial class CompanionBubbleWindow : Window
         PropertyNameCaseInsensitive = true
     };
 
-    public CompanionBubbleWindow(Uri baseUri, HttpClient httpClient, Window mainWindow)
+    public CompanionBubbleWindow(Uri baseUri, HttpClient httpClient, Window mainWindow, Func<Task<string?>>? cookieHeaderProvider = null)
     {
         InitializeComponent();
         _baseUri = baseUri;
         _httpClient = httpClient;
         _mainWindow = mainWindow;
+        _cookieHeaderProvider = cookieHeaderProvider;
         ToolTip = "SpiritDesk 桌面浮球：单击展开，双击打开主窗口，右键菜单直接选择精灵";
 
         _singleClickTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(230) };
@@ -193,40 +196,89 @@ public partial class CompanionBubbleWindow : Window
         }
 
         cm.Items.Clear();
+        cm.Items.Add(CreateSectionLabel("切换精灵"));
         var current = (_status?.Name ?? string.Empty).Trim();
         foreach (var (id, displayName) in BuiltInSpiritPickers)
         {
             var sid = id.Trim();
             var isCurrent = !string.IsNullOrEmpty(current)
                 && string.Equals(current, displayName, StringComparison.OrdinalIgnoreCase);
-            var mi = new MenuItem
-            {
-                Header = isCurrent ? $"{displayName}（当前 ✓）" : displayName,
-                Tag = sid
-            };
-            mi.Click += SpiritSwitchPickMenuItem_Click;
-            cm.Items.Add(mi);
+            cm.Items.Add(CreateSpiritMenuItem(displayName, sid, isCurrent));
         }
 
         cm.Items.Add(new Separator());
+        cm.Items.Add(CreateSectionLabel("桌面控制"));
         AppendStaticCompanionMenuItems(cm);
     }
 
     private void AppendStaticCompanionMenuItems(ContextMenu cm)
     {
-        cm.Items.Add(MenuLink("打开 SpiritDesk", OpenSpiritDeskMenuItem_Click));
-        cm.Items.Add(MenuLink("重置位置", ResetPositionMenuItem_Click));
-        cm.Items.Add(MenuLink(_theme == "warm" ? "切换到薄荷主题" : "切换到暖色主题", ToggleThemeMenuItem_Click));
-        cm.Items.Add(MenuLink(Topmost ? "取消置顶" : "置顶", ToggleTopmostMenuItem_Click));
+        cm.Items.Add(MenuLink("打开 SpiritDesk", "↗", OpenSpiritDeskMenuItem_Click));
+        cm.Items.Add(MenuLink("重置位置", "⌖", ResetPositionMenuItem_Click));
+        cm.Items.Add(MenuLink(_theme == "warm" ? "切换到薄荷主题" : "切换到暖色主题", "◐", ToggleThemeMenuItem_Click));
+        cm.Items.Add(MenuLink(Topmost ? "取消置顶" : "置顶", "▣", ToggleTopmostMenuItem_Click));
         cm.Items.Add(new Separator());
-        cm.Items.Add(MenuLink("退出", ExitMenuItem_Click));
+        cm.Items.Add(MenuLink("退出", "×", ExitMenuItem_Click));
     }
 
-    private static MenuItem MenuLink(string header, RoutedEventHandler handler)
+    private static MenuItem MenuLink(string header, string iconGlyph, RoutedEventHandler handler)
     {
-        var mi = new MenuItem { Header = header };
+        var mi = new MenuItem
+        {
+            Header = header,
+            Icon = CreateGlyphIcon(iconGlyph)
+        };
         mi.Click += handler;
         return mi;
+    }
+
+    private MenuItem CreateSpiritMenuItem(string displayName, string spiritId, bool isCurrent)
+    {
+        var item = new MenuItem
+        {
+            Header = isCurrent ? $"{displayName}  当前" : displayName,
+            Tag = spiritId,
+            Icon = CreateSpiritIcon(isCurrent)
+        };
+        item.Click += SpiritSwitchPickMenuItem_Click;
+        return item;
+    }
+
+    private static TextBlock CreateSectionLabel(string text)
+    {
+        return new TextBlock
+        {
+            Text = text,
+            Margin = new Thickness(12, 4, 12, 2),
+            FontSize = 11,
+            FontWeight = FontWeights.Bold,
+            Foreground = ToBrush("#7A9288")
+        };
+    }
+
+    private static Border CreateSpiritIcon(bool isCurrent)
+    {
+        return new Border
+        {
+            Width = 12,
+            Height = 12,
+            CornerRadius = new CornerRadius(6),
+            BorderThickness = new Thickness(1),
+            BorderBrush = ToBrush(isCurrent ? "#5AA17A" : "#BFD4C9"),
+            Background = isCurrent ? ToBrush("#5AA17A") : Brushes.Transparent
+        };
+    }
+
+    private static TextBlock CreateGlyphIcon(string glyph)
+    {
+        return new TextBlock
+        {
+            Text = glyph,
+            FontSize = 13,
+            FontWeight = FontWeights.Bold,
+            Foreground = ToBrush("#6D877C"),
+            VerticalAlignment = VerticalAlignment.Center
+        };
     }
 
     private async void SpiritSwitchPickMenuItem_Click(object sender, RoutedEventArgs e)
@@ -416,7 +468,15 @@ public partial class CompanionBubbleWindow : Window
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(4));
             var endpoint = new Uri(_baseUri, "/api/companion/current");
             Log($"Companion API URL: {endpoint}");
-            var dto = await _httpClient.GetFromJsonAsync<CompanionStatusDto>(endpoint, ApiJsonOptions, cts.Token);
+            using var request = await CreateRequestAsync(HttpMethod.Get, endpoint).ConfigureAwait(false);
+            using var response = await _httpClient.SendAsync(request, cts.Token).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+            {
+                Log($"Companion API HTTP {(int)response.StatusCode}");
+                return;
+            }
+
+            var dto = await response.Content.ReadFromJsonAsync<CompanionStatusDto>(ApiJsonOptions, cts.Token).ConfigureAwait(false);
             if (dto is null)
             {
                 Log("Companion API returned null payload.");
@@ -471,7 +531,9 @@ public partial class CompanionBubbleWindow : Window
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(12));
             var uri = new Uri(_baseUri, "/api/companion/select-spirit");
-            using var response = await _httpClient.PostAsJsonAsync(uri, new { spiritId = spiritId.Trim() }, ApiJsonOptions, cts.Token).ConfigureAwait(false);
+            var payloadJson = JsonSerializer.Serialize(new { spiritId = spiritId.Trim() });
+            using var request = await CreateRequestAsync(HttpMethod.Post, uri, payloadJson).ConfigureAwait(false);
+            using var response = await _httpClient.SendAsync(request, cts.Token).ConfigureAwait(false);
             if (!response.IsSuccessStatusCode)
             {
                 Log($"Select spirit HTTP {(int)response.StatusCode}");
@@ -500,6 +562,28 @@ public partial class CompanionBubbleWindow : Window
             Level = Math.Max(1, input.Level),
             Coins = Math.Max(0, input.Coins)
         };
+    }
+
+    private async Task<HttpRequestMessage> CreateRequestAsync(HttpMethod method, Uri uri, string? payloadJson = null)
+    {
+        var request = new HttpRequestMessage(method, uri);
+        if (!string.IsNullOrWhiteSpace(payloadJson))
+        {
+            request.Content = new StringContent(payloadJson, Encoding.UTF8, "application/json");
+        }
+
+        if (_cookieHeaderProvider is null)
+        {
+            return request;
+        }
+
+        var cookieHeader = await _cookieHeaderProvider().ConfigureAwait(false);
+        if (!string.IsNullOrWhiteSpace(cookieHeader))
+        {
+            request.Headers.TryAddWithoutValidation("Cookie", cookieHeader);
+        }
+
+        return request;
     }
 
     private void ApplyStatus(CompanionStatusDto dto)

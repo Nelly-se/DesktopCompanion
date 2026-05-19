@@ -13,6 +13,7 @@ using SpiritDesk.Web.Data;
 namespace SpiritDesk.Web.Pages;
 
 [AllowAnonymous]
+[IgnoreAntiforgeryToken]
 public class LoginModel(
     IConfiguration configuration,
     SpiritDeskDbContext dbContext,

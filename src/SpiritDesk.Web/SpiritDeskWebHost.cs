@@ -18,11 +18,14 @@ public static class SpiritDeskWebHost
 {
     public static WebApplication Build(string[] args, string? contentRoot = null, string? webRoot = null, string[]? urls = null)
     {
+        var resolvedContentRoot = contentRoot ?? Directory.GetCurrentDirectory();
+        DotEnvLoader.LoadNearest(resolvedContentRoot);
+
         var options = new WebApplicationOptions
         {
             Args = args,
             ApplicationName = typeof(SpiritDeskWebHost).Assembly.FullName,
-            ContentRootPath = contentRoot ?? Directory.GetCurrentDirectory(),
+            ContentRootPath = resolvedContentRoot,
             WebRootPath = webRoot
         };
 

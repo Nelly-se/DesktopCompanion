@@ -5,6 +5,7 @@ using SpiritDesk.Web.Services;
 
 namespace SpiritDesk.Web.Pages.Spirits;
 
+[IgnoreAntiforgeryToken]
 public class SelectModel(SpiritDeskService spiritDeskService) : PageModel
 {
     public List<SpiritDefinition> Spirits { get; private set; } = [];

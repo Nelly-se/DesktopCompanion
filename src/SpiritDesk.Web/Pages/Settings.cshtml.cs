@@ -5,6 +5,7 @@ using SpiritDesk.Web.Services;
 
 namespace SpiritDesk.Web.Pages;
 
+[IgnoreAntiforgeryToken]
 public class SettingsModel(SpiritDeskService spiritDeskService) : PageModel
 {
     public SettingsViewModel Settings { get; private set; } = default!;

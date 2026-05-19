@@ -5,6 +5,7 @@ using SpiritDesk.Web.Services;
 
 namespace SpiritDesk.Web.Pages;
 
+[IgnoreAntiforgeryToken]
 public class ChatModel(SpiritDeskService spiritDeskService) : PageModel
 {
     public ChatHistoryViewModel ChatHistory { get; private set; } = default!;
@@ -15,17 +16,34 @@ public class ChatModel(SpiritDeskService spiritDeskService) : PageModel
     [BindProperty]
     public string MessageText { get; set; } = string.Empty;
 
+    [BindProperty(SupportsGet = true)]
+    public string SpiritId { get; set; } = string.Empty;
+
+    [BindProperty(SupportsGet = true)]
+    public int? FocusMessageId { get; set; }
+
     public async Task<IActionResult> OnGetAsync()
     {
         if (await spiritDeskService.NeedsSpiritSelectionAsync()) return RedirectToPage("/Spirits/Select");
-        ChatHistory = await spiritDeskService.BuildChatHistoryViewModelAsync();
+        ChatHistory = await spiritDeskService.BuildChatHistoryViewModelAsync(SpiritId);
+        SpiritId = ChatHistory.CurrentSpirit.Id;
         return Page();
     }
 
     public async Task<IActionResult> OnPostSendMessageAsync()
     {
-        await spiritDeskService.SendMessageAsync(MessageText);
+        await spiritDeskService.SendMessageAsync(MessageText, SpiritId);
         NoticeMessage = "新消息已发送，聊天记录已更新。";
-        return RedirectToPage();
+        return RedirectToPage(new { spiritId = SpiritId });
+    }
+
+    public IActionResult OnPostSwitchSpiritAsync()
+    {
+        if (string.IsNullOrWhiteSpace(SpiritId))
+        {
+            return RedirectToPage();
+        }
+
+        return RedirectToPage(new { spiritId = SpiritId });
     }
 }

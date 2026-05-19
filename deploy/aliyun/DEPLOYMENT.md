@@ -53,6 +53,24 @@ dotnet run --project .\src\SpiritDesk.Web\SpiritDesk.Web.csproj
 dotnet run --project .\src\SpiritDesk.Shell\SpiritDesk.Shell.csproj
 ```
 
+### Q5: 本地如何接入豆包 / 方舟？
+
+在仓库根目录复制一份本地配置文件：
+
+```powershell
+Copy-Item .\.env.example .\.env
+```
+
+然后填入真实密钥：
+
+```dotenv
+ARK_API_KEY=你的方舟密钥
+ARK_API_BASE=https://ark.cn-beijing.volces.com/api/v3
+ARK_MODEL=doubao-seed-2-0-lite-260215
+```
+
+`SpiritDesk.Web` 与 `SpiritDesk.Shell` 启动的本地 Web 子进程都会自动向上查找并加载这个 `.env`。
+
 ## 6. 云端演示登录（可选）
 
 当站点暴露在公网时，可在 **不配数据库多用户** 的前提下启用「单账号 Cookie 登录」，用于答辩演示防扫。
@@ -72,6 +90,9 @@ sudo nano /etc/spiritdesk/spiritdesk.env
 SpiritDesk__Auth__Enabled=true
 SpiritDesk__Auth__Username=你的用户名
 SpiritDesk__Auth__Password=你的强密码
+ARK_API_KEY=你的方舟密钥
+ARK_API_BASE=https://ark.cn-beijing.volces.com/api/v3
+ARK_MODEL=doubao-seed-2-0-lite-260215
 ```
 
 3. 权限与重启：
@@ -108,7 +129,9 @@ sudo systemctl restart spiritdesk-web
 .\deploy\scripts\publish-web.ps1
 ```
 
-将输出的 `artifacts\spiritdesk-web-publish`（或脚本提示的路径）整体上传到服务器 Web 目录，例如：
+将输出目录 `artifacts\spiritdesk-web-publish` 内的全部文件上传到服务器 Web 目录 `/opt/spiritdesk/web/`。
+
+如果你使用本仓库提供的 `deploy/systemd/spiritdesk-web.service`，就按下面这组路径，不要改成别的默认目录：
 
 ```powershell
 scp -r .\artifacts\spiritdesk-web-publish\* user@116.62.19.40:/opt/spiritdesk/web/

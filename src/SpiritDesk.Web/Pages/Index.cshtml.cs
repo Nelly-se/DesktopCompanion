@@ -5,6 +5,7 @@ using SpiritDesk.Web.Services;
 
 namespace SpiritDesk.Web.Pages;
 
+[IgnoreAntiforgeryToken]
 public class IndexModel(SpiritDeskService spiritDeskService) : PageModel
 {
     public SpiritDeskViewModel Desk { get; private set; } = default!;

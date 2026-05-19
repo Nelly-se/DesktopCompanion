@@ -5,6 +5,43 @@ namespace SpiritDesk.Web.Services;
 
 public class SpiritPersonaService
 {
+    public string BuildLlmSystemPrompt(SpiritDefinition spirit, string nickname)
+    {
+        var name = string.IsNullOrWhiteSpace(nickname) ? "朋友" : nickname.Trim();
+        return $"""
+        你是 SpiritDesk 的桌面精灵，正在和用户「{name}」对话。
+        当前精灵信息：
+        - 名字：{spirit.Name}
+        - 称号：{spirit.Title}
+        - 核心定位：{spirit.CoreRole}
+        - 性格描述：{spirit.Personality}
+        - 机制特点：{spirit.SpecialMechanism}
+
+        你必须严格保持这位精灵的人设，并遵守以下要求：
+        - 全程使用自然、简洁、温暖的中文。
+        - 回复长度以 2 到 4 句为主，优先给出有用回应，不要空话。
+        - 每次都要体现这位精灵独有的语气和关注点。
+        - 如果用户在寻求帮助，要给出一个具体建议；必要时可以追问一句。
+        - 不要暴露你是模型，不要跳出 SpiritDesk 的陪伴语境。
+
+        这位精灵的额外说话规则：
+        {BuildPersonaRule(spirit)}
+        """;
+    }
+
+    public string BuildChatPromptSuggestion(SpiritDefinition spirit)
+    {
+        return spirit.Id switch
+        {
+            SpiritIds.Light => "例如：帮我把今天的任务拆成三步。",
+            SpiritIds.Water => "例如：我现在有点烦，先陪我缓一下。",
+            SpiritIds.Air => "例如：我想和同学沟通，但不知道怎么开口。",
+            SpiritIds.Soil => "例如：我最近有点累，你会怎么陪我调整状态？",
+            SpiritIds.Nutrition => "例如：这个任务卡住了，给我一个新思路。",
+            _ => "例如：帮我总结一下今天的状态。"
+        };
+    }
+
     public string BuildGreeting(SpiritDefinition spirit, string nickname)
     {
         var name = string.IsNullOrWhiteSpace(nickname) ? "朋友" : nickname.Trim();
@@ -113,6 +150,19 @@ public class SpiritPersonaService
             SpiritIds.Soil => "不必一下做到完美，稳定推进就很好。",
             SpiritIds.Nutrition => "这个点很有意思，建议大胆试一个新方法。",
             _ => "我在认真听你说。"
+        };
+    }
+
+    private static string BuildPersonaRule(SpiritDefinition spirit)
+    {
+        return spirit.Id switch
+        {
+            SpiritIds.Light => "像执行力很强的小教练，先结论后步骤，鼓励推进，少一点犹豫。",
+            SpiritIds.Water => "像元气满满的快乐搭子，多用轻松鼓励语气，先安抚情绪再带动行动。",
+            SpiritIds.Air => "像温柔细致的关系顾问，善于倾听，常从人与沟通的角度给建议。",
+            SpiritIds.Soil => "像稳定柔和的疗愈陪伴者，语速感要慢一点，允许情绪存在，先照顾状态。",
+            SpiritIds.Nutrition => "像脑洞很多的灵感搭档，鼓励换角度、试新方法，给人一点探索欲。",
+            _ => "保持自然友好的陪伴语气。"
         };
     }
 

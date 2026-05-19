@@ -32,19 +32,37 @@ SpiritDesk 是一个“桌面精灵伴侣 Agent”项目，不是单纯网页系
 dotnet build SpiritDesk.sln
 ```
 
+## 本地 LLM 配置（豆包 / 方舟）
+
+项目支持直接读取仓库根目录或 `src/SpiritDesk.Web` 目录下的 `.env` 文件。
+
+1. 复制 `.\.env.example` 为 `.\.env`
+2. 填入你的真实 `ARK_API_KEY`
+3. 保持 `ARK_API_BASE=https://ark.cn-beijing.volces.com/api/v3`
+4. 保持 `ARK_MODEL=doubao-seed-2-0-lite-260215`
+
+`.env` 已被 `.gitignore` 忽略，不会默认提交。
+
 ## 运行方式
 
 ### 1) 本地桌面版（推荐答辩演示）
 
 ```powershell
-dotnet run --project .\src\SpiritDesk.Shell\SpiritDesk.Shell.csproj
+.\run-shell.ps1
 ```
+
+- 桌面壳会自动拉起本地 `SpiritDesk.Web`
+- 本地桌面模式默认关闭登录门禁，不需要先单独启动网页端
+- 若你之前设置过 `SPIRITDESK_REMOTE_BASEURL`，`run-shell.ps1` 会在当前进程里忽略它，优先走本地模式
 
 ### 2) 本地 Web 版
 
 ```powershell
 dotnet run --project .\src\SpiritDesk.Web\SpiritDesk.Web.csproj
 ```
+
+- 默认地址：`http://localhost:5160`
+- 默认开发环境演示账号：`spiritdesk / spiritdesk`
 
 ### 3) Shell 连接云端 Web
 

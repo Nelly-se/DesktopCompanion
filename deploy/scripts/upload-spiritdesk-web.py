@@ -11,8 +11,8 @@
   SPIRITDEPLOY_HOST             默认 116.62.19.40
   SPIRITDEPLOY_USER             默认 root
   SPIRITDEPLOY_PORT             默认 22
-  SPIRITDEPLOY_REMOTE_WEB       默认 /www/wwwroot/spiritdesk
-  SPIRITDEPLOY_URLS             默认 http://127.0.0.1:5000（与宝塔 Nginx 反代端口一致）
+  SPIRITDEPLOY_REMOTE_WEB       默认 /opt/spiritdesk/web
+  SPIRITDEPLOY_URLS             默认 http://127.0.0.1:8080
 
 依赖：pip install paramiko
 """
@@ -50,9 +50,9 @@ def main() -> int:
     user_ssh = os.environ.get("SPIRITDEPLOY_USER", "root").strip()
     port = int(os.environ.get("SPIRITDEPLOY_PORT", "22") or "22")
     remote_web = (
-        os.environ.get("SPIRITDEPLOY_REMOTE_WEB", "/www/wwwroot/spiritdesk").strip().rstrip("/")
+        os.environ.get("SPIRITDEPLOY_REMOTE_WEB", "/opt/spiritdesk/web").strip().rstrip("/")
     )
-    asp_urls = os.environ.get("SPIRITDEPLOY_URLS", "http://127.0.0.1:5000").strip()
+    asp_urls = os.environ.get("SPIRITDEPLOY_URLS", "http://127.0.0.1:8080").strip()
 
     local = repo_root_from_script() / "artifacts" / "spiritdesk-web-publish"
     if not local.is_dir():

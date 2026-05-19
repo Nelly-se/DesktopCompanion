@@ -11,12 +11,13 @@ public class SpiritDeskService(SpiritDeskDbContext dbContext, SpiritPersonaServi
     public async Task<SpiritDeskViewModel> BuildViewModelAsync()
     {
         await EnsureInitializedAsync();
-        var profile = await dbContext.UserProfiles.OrderBy(x => x.Id).FirstAsync();
+        var profile = await GetPrimaryProfileAsync();
         var spirits = await dbContext.Spirits.OrderBy(x => x.Id).ToListAsync();
-        var currentSpirit = spirits.First(x => x.Id == profile.CurrentSpiritId);
+        var currentSpirit = await GetSelectedSpiritAsync(profile)
+            ?? spirits.FirstOrDefault(x => x.Id == SpiritIds.Light)
+            ?? spirits.First();
         var tasks = await dbContext.Tasks.OrderBy(x => x.IsCompleted).ThenBy(x => x.DueAt).Take(200).ToListAsync();
-        var chatMessages = await dbContext.ChatMessages.OrderByDescending(x => x.CreatedAt).Take(16).ToListAsync();
-        chatMessages.Reverse();
+        var chatMessages = await GetConversationMessagesAsync(currentSpirit.Id, 16);
 
         var today = DateOnly.FromDateTime(DateTime.Now);
         var dailyCounts = await dbContext.DailyActionLogs.Where(x => x.ActionDate == today).ToDictionaryAsync(x => x.ActionType, x => x.Count);
@@ -46,9 +47,11 @@ public class SpiritDeskService(SpiritDeskDbContext dbContext, SpiritPersonaServi
     public async Task<SettingsViewModel> BuildSettingsViewModelAsync()
     {
         await EnsureInitializedAsync();
-        var profile = await dbContext.UserProfiles.OrderBy(x => x.Id).FirstAsync();
+        var profile = await GetPrimaryProfileAsync();
         var spirits = await dbContext.Spirits.OrderBy(x => x.Id).ToListAsync();
-        var currentSpirit = spirits.First(x => x.Id == profile.CurrentSpiritId);
+        var currentSpirit = await GetSelectedSpiritAsync(profile)
+            ?? spirits.FirstOrDefault(x => x.Id == SpiritIds.Light)
+            ?? spirits.First();
         return new SettingsViewModel
         {
             Profile = profile,
@@ -60,21 +63,40 @@ public class SpiritDeskService(SpiritDeskDbContext dbContext, SpiritPersonaServi
         };
     }
 
-    public async Task<ChatHistoryViewModel> BuildChatHistoryViewModelAsync()
+    public async Task<ChatHistoryViewModel> BuildChatHistoryViewModelAsync(string? spiritId = null)
     {
         await EnsureInitializedAsync();
-        var profile = await dbContext.UserProfiles.OrderBy(x => x.Id).FirstAsync();
+        var profile = await GetPrimaryProfileAsync();
         var spirits = await dbContext.Spirits.OrderBy(x => x.Id).ToListAsync();
-        var currentSpirit = spirits.First(x => x.Id == profile.CurrentSpiritId);
+        var selectedSpirit = await GetSelectedSpiritAsync(profile);
+        var currentSpirit = spirits.FirstOrDefault(x => x.Id == spiritId)
+            ?? selectedSpirit
+            ?? spirits.FirstOrDefault(x => x.Id == SpiritIds.Light)
+            ?? spirits.First();
         var messages = await dbContext.ChatMessages.OrderBy(x => x.CreatedAt).ToListAsync();
+        var currentConversationMessages = FilterConversationMessages(messages, currentSpirit.Id);
+        var activeThreadCount = messages
+            .Where(x => !string.IsNullOrWhiteSpace(x.SpiritId))
+            .Select(x => x.SpiritId!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Count();
+
+        if (activeThreadCount == 0 && messages.Count > 0)
+        {
+            activeThreadCount = 1;
+        }
+
         return new ChatHistoryViewModel
         {
             Profile = profile,
             CurrentSpirit = currentSpirit,
             Spirits = spirits,
             Messages = messages,
-            UserMessageCount = messages.Count(x => x.Sender == "user"),
-            SpiritMessageCount = messages.Count(x => x.Sender == "spirit")
+            CurrentConversationMessages = currentConversationMessages,
+            TotalMessageCount = messages.Count,
+            ActiveThreadCount = activeThreadCount,
+            UserMessageCount = currentConversationMessages.Count(x => x.Sender == "user"),
+            SpiritMessageCount = currentConversationMessages.Count(x => x.Sender == "spirit")
         };
     }
 
@@ -82,46 +104,60 @@ public class SpiritDeskService(SpiritDeskDbContext dbContext, SpiritPersonaServi
     {
         await dbContext.Database.EnsureCreatedAsync();
         await EnsureUserProfileSchemaAsync();
+        await EnsureChatMessageSchemaAsync();
         await EnsureSpiritDefinitionsAsync();
 
         if (!await dbContext.UserProfiles.AnyAsync())
         {
             dbContext.UserProfiles.Add(new UserProfile { Nickname = string.Empty, CurrentSpiritId = string.Empty, Mood = 76, Affinity = 18, Level = 1, Coins = 30 });
         }
+        var primaryProfile = await dbContext.UserProfiles.OrderBy(x => x.Id).FirstOrDefaultAsync();
         if (!await dbContext.Tasks.AnyAsync()) dbContext.Tasks.AddRange(BuildDemoTasks());
-        if (!await dbContext.ChatMessages.AnyAsync()) dbContext.ChatMessages.AddRange(BuildDemoChatMessages());
+        if (!await dbContext.ChatMessages.AnyAsync()) dbContext.ChatMessages.AddRange(BuildDemoChatMessages(primaryProfile?.CurrentSpiritId));
         await dbContext.SaveChangesAsync();
     }
 
-    public async Task<bool> NeedsSpiritSelectionAsync() { await EnsureInitializedAsync(); return string.IsNullOrWhiteSpace((await dbContext.UserProfiles.FirstAsync()).CurrentSpiritId); }
+    public async Task<bool> NeedsSpiritSelectionAsync()
+    {
+        await EnsureInitializedAsync();
+        var profile = await GetPrimaryProfileAsync();
+        return await GetSelectedSpiritAsync(profile) is null;
+    }
+
     public async Task<List<SpiritDefinition>> GetSpiritsAsync() { await EnsureInitializedAsync(); return await dbContext.Spirits.OrderBy(x => x.Id).ToListAsync(); }
 
     public async Task<SpiritSelectionResult> SelectSpiritAsync(string spiritId)
     {
         await EnsureInitializedAsync();
-        var profile = await dbContext.UserProfiles.FirstAsync();
+        var profile = await GetPrimaryProfileAsync();
         var spirit = await dbContext.Spirits.FirstOrDefaultAsync(x => x.Id == spiritId);
         if (spirit is null) return new SpiritSelectionResult { Succeeded = false, Message = "未找到该精灵。" };
         profile.CurrentSpiritId = spiritId;
         profile.LastSpiritSwitchAt = DateTime.Now;
         profile.UpdatedAt = DateTime.Now;
-        dbContext.ChatMessages.Add(new ChatMessage { Sender = "spirit", Content = $"已绑定精灵：{spirit.Name}。" });
+        dbContext.ChatMessages.Add(new ChatMessage
+        {
+            Sender = "spirit",
+            SpiritId = spirit.Id,
+            Content = $"{spirit.Name} 已来到桌面。{personaService.BuildGreeting(spirit, profile.Nickname)}"
+        });
         await dbContext.SaveChangesAsync();
         return new SpiritSelectionResult { Succeeded = true, Message = $"已切换为 {spirit.Name}。", SpiritName = spirit.Name };
     }
 
-    public async Task SendMessageAsync(string message)
+    public async Task SendMessageAsync(string message, string? spiritId = null)
     {
         if (string.IsNullOrWhiteSpace(message)) return;
         await EnsureInitializedAsync();
-        var profile = await dbContext.UserProfiles.FirstAsync();
-        if (string.IsNullOrWhiteSpace(profile.CurrentSpiritId)) return;
-        var spirit = await dbContext.Spirits.FirstAsync(x => x.Id == profile.CurrentSpiritId);
+        var profile = await GetPrimaryProfileAsync();
+        var spirit = await ResolveConversationSpiritAsync(profile, spiritId);
+        if (spirit is null) return;
+        var recentConversation = await GetConversationMessagesAsync(spirit.Id, 10);
         var trimmed = message.Trim();
-        dbContext.ChatMessages.Add(new ChatMessage { Sender = "user", Content = trimmed });
+        dbContext.ChatMessages.Add(new ChatMessage { Sender = "user", SpiritId = spirit.Id, Content = trimmed });
         var fallbackReply = personaService.GenerateReply(spirit, trimmed);
-        var reply = await llmReplyService.GenerateReplyAsync(spirit, profile.Nickname, trimmed, fallbackReply);
-        dbContext.ChatMessages.Add(new ChatMessage { Sender = "spirit", Content = reply });
+        var reply = await llmReplyService.GenerateReplyAsync(spirit, profile.Nickname, trimmed, fallbackReply, recentConversation);
+        dbContext.ChatMessages.Add(new ChatMessage { Sender = "spirit", SpiritId = spirit.Id, Content = reply });
         profile.UpdatedAt = DateTime.Now;
         await dbContext.SaveChangesAsync();
     }
@@ -130,7 +166,7 @@ public class SpiritDeskService(SpiritDeskDbContext dbContext, SpiritPersonaServi
     {
         if (string.IsNullOrWhiteSpace(nickname)) return;
         await EnsureInitializedAsync();
-        var profile = await dbContext.UserProfiles.FirstAsync();
+        var profile = await GetPrimaryProfileAsync();
         profile.Nickname = nickname.Trim();
         profile.UpdatedAt = DateTime.Now;
         await dbContext.SaveChangesAsync();
@@ -167,8 +203,9 @@ public class SpiritDeskService(SpiritDeskDbContext dbContext, SpiritPersonaServi
     {
         var task = await dbContext.Tasks.FirstOrDefaultAsync(x => x.Id == taskId);
         if (task is null || task.IsCompleted) return new OperationFeedback { Succeeded = false, Message = "这个任务已经处理过了。" };
-        var profile = await dbContext.UserProfiles.FirstAsync();
-        var spirit = await dbContext.Spirits.FirstAsync(x => x.Id == profile.CurrentSpiritId);
+        var profile = await GetPrimaryProfileAsync();
+        var spirit = await GetSelectedSpiritAsync(profile);
+        if (spirit is null) return new OperationFeedback { Succeeded = false, Message = "当前没有可用精灵，请重新选择一位精灵伙伴。" };
         var beforeMood = profile.Mood; var beforeAffinity = profile.Affinity; var beforeCoins = profile.Coins; var beforeLevel = profile.Level;
         task.IsCompleted = true; task.CompletedAt = DateTime.Now;
         profile.Mood = Math.Min(100, profile.Mood + 5);
@@ -176,7 +213,7 @@ public class SpiritDeskService(SpiritDeskDbContext dbContext, SpiritPersonaServi
         profile.Coins += 5;
         profile.Level = Math.Max(1, profile.Affinity / 100 + 1);
         profile.UpdatedAt = DateTime.Now;
-        dbContext.ChatMessages.Add(new ChatMessage { Sender = "spirit", Content = $"{spirit.Name} 记录了这次完成。{spirit.SpecialMechanism}" });
+        dbContext.ChatMessages.Add(new ChatMessage { Sender = "spirit", SpiritId = spirit.Id, Content = $"{spirit.Name} 记录了这次完成。{spirit.SpecialMechanism}" });
         await dbContext.SaveChangesAsync();
         return new OperationFeedback { Succeeded = true, Message = $"已完成任务：《{task.Title}》。", MoodDelta = profile.Mood - beforeMood, AffinityDelta = profile.Affinity - beforeAffinity, CoinsDelta = profile.Coins - beforeCoins, LevelDelta = profile.Level - beforeLevel };
     }
@@ -185,8 +222,9 @@ public class SpiritDeskService(SpiritDeskDbContext dbContext, SpiritPersonaServi
     {
         var today = DateOnly.FromDateTime(DateTime.Now);
         var log = await dbContext.DailyActionLogs.FirstOrDefaultAsync(x => x.ActionDate == today && x.ActionType == actionType) ?? new DailyActionLog { ActionDate = today, ActionType = actionType, Count = 0 };
-        var profile = await dbContext.UserProfiles.FirstAsync();
-        var spirit = await dbContext.Spirits.FirstAsync(x => x.Id == profile.CurrentSpiritId);
+        var profile = await GetPrimaryProfileAsync();
+        var spirit = await GetSelectedSpiritAsync(profile);
+        if (spirit is null) return new OperationFeedback { Succeeded = false, Message = "当前没有可用精灵，请重新选择一位精灵伙伴。" };
         var beforeMood = profile.Mood; var beforeAffinity = profile.Affinity; var beforeCoins = profile.Coins; var beforeLevel = profile.Level;
         var limits = new Dictionary<string, int> { ["checkin"] = 1, ["feed"] = 3, ["encourage"] = 5, ["study"] = 5, ["rest"] = 5, ["game"] = 5 + spirit.GameCountBonus };
         if (limits.TryGetValue(actionType, out var limit) && log.Count >= limit) return new OperationFeedback { Succeeded = false, Message = $"{GetActionDisplayName(actionType)}已达今日上限。" };
@@ -201,7 +239,7 @@ public class SpiritDeskService(SpiritDeskDbContext dbContext, SpiritPersonaServi
             case "encourage": case "study": case "rest": profile.Mood = Math.Min(100, profile.Mood + 2); profile.Affinity += 1; break;
         }
         profile.Level = Math.Max(1, profile.Affinity / 100 + 1); profile.UpdatedAt = DateTime.Now;
-        dbContext.ChatMessages.Add(new ChatMessage { Sender = "spirit", Content = personaService.BuildInteractionReply(spirit, actionType) });
+        dbContext.ChatMessages.Add(new ChatMessage { Sender = "spirit", SpiritId = spirit.Id, Content = personaService.BuildInteractionReply(spirit, actionType) });
         await dbContext.SaveChangesAsync();
         return new OperationFeedback { Succeeded = true, Message = $"{GetActionDisplayName(actionType)}完成。", MoodDelta = profile.Mood - beforeMood, AffinityDelta = profile.Affinity - beforeAffinity, CoinsDelta = profile.Coins - beforeCoins, LevelDelta = profile.Level - beforeLevel };
     }
@@ -209,8 +247,9 @@ public class SpiritDeskService(SpiritDeskDbContext dbContext, SpiritPersonaServi
     public async Task<OperationFeedback> PlayGameAsync(string userChoice)
     {
         if (string.IsNullOrWhiteSpace(userChoice)) return new OperationFeedback { Succeeded = false, Message = "请先选择石头、布或剪刀。" };
-        var profile = await dbContext.UserProfiles.FirstAsync();
-        var spirit = await dbContext.Spirits.FirstAsync(x => x.Id == profile.CurrentSpiritId);
+        var profile = await GetPrimaryProfileAsync();
+        var spirit = await GetSelectedSpiritAsync(profile);
+        if (spirit is null) return new OperationFeedback { Succeeded = false, Message = "当前没有可用精灵，请重新选择一位精灵伙伴。" };
         var beforeAffinity = profile.Affinity; var beforeCoins = profile.Coins; var beforeLevel = profile.Level;
         var today = DateOnly.FromDateTime(DateTime.Now);
         var log = await dbContext.DailyActionLogs.FirstOrDefaultAsync(x => x.ActionDate == today && x.ActionType == "game") ?? new DailyActionLog { ActionDate = today, ActionType = "game", Count = 0 };
@@ -225,7 +264,7 @@ public class SpiritDeskService(SpiritDeskDbContext dbContext, SpiritPersonaServi
         profile.Coins += outcome == "win" ? 5 + spirit.GameCoinBonus : outcome == "draw" ? 2 + spirit.GameCoinBonus : spirit.GameCoinBonus;
         profile.Level = Math.Max(1, profile.Affinity / 100 + 1); profile.UpdatedAt = DateTime.Now;
         var userText = ToChoiceText(userChoice); var spiritText = ToChoiceText(spiritChoice);
-        dbContext.ChatMessages.Add(new ChatMessage { Sender = "spirit", Content = $"{spirit.Name} 出了 {spiritText}，你出了 {userText}。{personaService.BuildGameReply(spirit, outcome)}" });
+        dbContext.ChatMessages.Add(new ChatMessage { Sender = "spirit", SpiritId = spirit.Id, Content = $"{spirit.Name} 出了 {spiritText}，你出了 {userText}。{personaService.BuildGameReply(spirit, outcome)}" });
         await dbContext.SaveChangesAsync();
         return new OperationFeedback { Succeeded = true, Message = outcome == "win" ? $"你赢了，{spirit.Name} 出了 {spiritText}。" : outcome == "draw" ? $"平局，{spirit.Name} 也出了 {spiritText}。" : $"{spirit.Name} 小胜，出了 {spiritText}。", AffinityDelta = profile.Affinity - beforeAffinity, CoinsDelta = profile.Coins - beforeCoins, LevelDelta = profile.Level - beforeLevel };
     }
@@ -236,18 +275,18 @@ public class SpiritDeskService(SpiritDeskDbContext dbContext, SpiritPersonaServi
         dbContext.Tasks.RemoveRange(await dbContext.Tasks.ToListAsync());
         dbContext.ChatMessages.RemoveRange(await dbContext.ChatMessages.ToListAsync());
         dbContext.DailyActionLogs.RemoveRange(await dbContext.DailyActionLogs.ToListAsync());
-        var profile = await dbContext.UserProfiles.FirstAsync();
+        var profile = await GetPrimaryProfileAsync();
         profile.Mood = 76; profile.Affinity = 18; profile.Level = 1; profile.Coins = 30; profile.UpdatedAt = DateTime.Now;
-        dbContext.Tasks.AddRange(BuildDemoTasks()); dbContext.ChatMessages.AddRange(BuildDemoChatMessages());
+        dbContext.Tasks.AddRange(BuildDemoTasks()); dbContext.ChatMessages.AddRange(BuildDemoChatMessages(profile.CurrentSpiritId));
         await dbContext.SaveChangesAsync();
         return new OperationFeedback { Succeeded = true, Message = "演示数据已重置。" };
     }
 
     public async Task<OperationFeedback?> ApplyWelcomeBackEffectAsync()
     {
-        var profile = await dbContext.UserProfiles.FirstAsync();
-        if (string.IsNullOrWhiteSpace(profile.CurrentSpiritId)) return null;
-        var spirit = await dbContext.Spirits.FirstAsync(x => x.Id == profile.CurrentSpiritId);
+        var profile = await GetPrimaryProfileAsync();
+        var spirit = await GetSelectedSpiritAsync(profile);
+        if (spirit is null) return null;
         if (!spirit.WelcomeBackCompensation || (DateTime.Now - profile.UpdatedAt) < TimeSpan.FromHours(6)) return null;
         var beforeMood = profile.Mood;
         profile.Mood = Math.Min(100, profile.Mood + 10);
@@ -290,6 +329,90 @@ public class SpiritDeskService(SpiritDeskDbContext dbContext, SpiritPersonaServi
         }
     }
 
+    private async Task EnsureChatMessageSchemaAsync()
+    {
+        await using var connection = dbContext.Database.GetDbConnection();
+        if (connection.State != System.Data.ConnectionState.Open) await connection.OpenAsync();
+        await using var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA table_info(\"ChatMessages\")";
+        await using var reader = await command.ExecuteReaderAsync();
+        var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        while (await reader.ReadAsync()) columns.Add(reader.GetString(1));
+        if (!columns.Contains("SpiritId"))
+        {
+            await using var alter = connection.CreateCommand();
+            alter.CommandText = "ALTER TABLE \"ChatMessages\" ADD COLUMN \"SpiritId\" TEXT NULL";
+            await alter.ExecuteNonQueryAsync();
+        }
+    }
+
+    private async Task<UserProfile> GetPrimaryProfileAsync()
+    {
+        return await dbContext.UserProfiles.OrderBy(x => x.Id).FirstAsync();
+    }
+
+    private async Task<SpiritDefinition?> GetSelectedSpiritAsync(UserProfile profile)
+    {
+        if (string.IsNullOrWhiteSpace(profile.CurrentSpiritId))
+        {
+            return null;
+        }
+
+        var spirit = await dbContext.Spirits.FirstOrDefaultAsync(x => x.Id == profile.CurrentSpiritId);
+        if (spirit is not null)
+        {
+            return spirit;
+        }
+
+        profile.CurrentSpiritId = string.Empty;
+        profile.LastSpiritSwitchAt = null;
+        profile.UpdatedAt = DateTime.Now;
+        await dbContext.SaveChangesAsync();
+        return null;
+    }
+
+    private async Task<SpiritDefinition?> ResolveConversationSpiritAsync(UserProfile profile, string? spiritId)
+    {
+        if (!string.IsNullOrWhiteSpace(spiritId))
+        {
+            var requestedSpirit = await dbContext.Spirits.FirstOrDefaultAsync(x => x.Id == spiritId);
+            if (requestedSpirit is not null)
+            {
+                return requestedSpirit;
+            }
+        }
+
+        return await GetSelectedSpiritAsync(profile);
+    }
+
+    private async Task<List<ChatMessage>> GetConversationMessagesAsync(string spiritId, int? take = null)
+    {
+        var allMessages = await dbContext.ChatMessages.OrderBy(x => x.CreatedAt).ToListAsync();
+        var filtered = FilterConversationMessages(allMessages, spiritId);
+        if (take.HasValue && filtered.Count > take.Value)
+        {
+            return filtered.TakeLast(take.Value).ToList();
+        }
+
+        return filtered;
+    }
+
+    private static List<ChatMessage> FilterConversationMessages(List<ChatMessage> allMessages, string spiritId)
+    {
+        var threadedMessages = allMessages
+            .Where(x => string.Equals(x.SpiritId, spiritId, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if (threadedMessages.Count > 0)
+        {
+            return threadedMessages;
+        }
+
+        return allMessages
+            .Where(x => string.IsNullOrWhiteSpace(x.SpiritId))
+            .ToList();
+    }
+
     private static string ResolveOutcome(string userChoice, string spiritChoice) => userChoice == spiritChoice ? "draw" : (userChoice, spiritChoice) switch
     {
         ("rock", "scissors") => "win", ("paper", "rock") => "win", ("scissors", "paper") => "win", _ => "lose"
@@ -314,10 +437,10 @@ public class SpiritDeskService(SpiritDeskDbContext dbContext, SpiritPersonaServi
         new TaskItem { Title = "给自己留 20 分钟休息", Description = "起身活动、喝水、放松眼睛。", DueAt = DateTime.Now.AddDays(1) }
     ];
 
-    private static List<ChatMessage> BuildDemoChatMessages() =>
+    private static List<ChatMessage> BuildDemoChatMessages(string? spiritId) =>
     [
-        new ChatMessage { Sender = "spirit", Content = "欢迎来到 SpiritDesk。今天想先安排任务，还是先聊聊状态？" },
-        new ChatMessage { Sender = "user", Content = "先帮我看看今天最重要的三件事。" },
-        new ChatMessage { Sender = "spirit", Content = "建议先处理最紧急的一项，再留出时间准备答辩展示。" }
+        new ChatMessage { Sender = "spirit", SpiritId = string.IsNullOrWhiteSpace(spiritId) ? SpiritIds.Light : spiritId, Content = "欢迎来到 SpiritDesk。今天想先安排任务，还是先聊聊状态？" },
+        new ChatMessage { Sender = "user", SpiritId = string.IsNullOrWhiteSpace(spiritId) ? SpiritIds.Light : spiritId, Content = "先帮我看看今天最重要的三件事。" },
+        new ChatMessage { Sender = "spirit", SpiritId = string.IsNullOrWhiteSpace(spiritId) ? SpiritIds.Light : spiritId, Content = "建议先处理最紧急的一项，再留出时间准备答辩展示。" }
     ];
 }

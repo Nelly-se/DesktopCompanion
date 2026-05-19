@@ -8,6 +8,7 @@ using SpiritDesk.Web.Auth;
 namespace SpiritDesk.Web.Pages;
 
 [AllowAnonymous]
+[IgnoreAntiforgeryToken]
 public class LogoutModel(IConfiguration configuration) : PageModel
 {
     public async Task<IActionResult> OnPostAsync()
