@@ -1,3 +1,7 @@
+// =============================================================================
+// Assistant.cshtml.cs — 任务助手页（复用 SpiritDeskViewModel 展示摘要 + 互动）
+// =============================================================================
+
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using SpiritDesk.Web.Models;

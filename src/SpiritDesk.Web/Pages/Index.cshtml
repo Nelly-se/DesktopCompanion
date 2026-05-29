@@ -1,4 +1,12 @@
-﻿@page
+﻿@*
+  【文件】Index.cshtml — Razor 视图（服务器 SSR，不是静态 HTML）
+  【URL】GET / 或 /Index
+  【后端】Index.cshtml.cs → IndexModel（OnGet 展示；OnPostXxx 处理表单）
+  【界面】工作台：任务列表、聊天摘要、签到投喂入口、猜拳、日历区
+  【数据】@Model.Desk 来自 SpiritDeskService.BuildViewModelAsync()
+  【静态资源】样式 site.css、脚本 site.js / desk-calendar.js 在 wwwroot，见 docs/basic/08-wwwroot与静态资源详解.md
+*@
+@page
 @using SpiritDesk.Web.Helpers
 @using System.Text.Json
 @inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
@@ -9,7 +17,8 @@
     var profile = Model.Desk.Profile;
     var spirit = Model.Desk.CurrentSpirit;
     var messages = Model.Desk.ChatMessages;
-    var recentMessages = messages.TakeLast(8).ToList();
+    var recentMessages = messages.TakeLast(12).ToList();
+    var displayNickname = string.IsNullOrWhiteSpace(profile.Nickname) ? "你" : profile.Nickname;
     var counts = Model.Desk.DailyCounts;
     var todayTasks = Model.Desk.TaskSnapshot.TodayTasks;
     var pendingTasks = Model.Desk.TaskSnapshot.PendingTasks;
@@ -57,7 +66,7 @@
             <section class="content-card profile-mini-card"><div class="card-head"><div><span class="card-kicker">成长</span><h3>@spirit.Name 的陪伴状态</h3></div><span class="tiny-badge">@spirit.Mbti</span></div><div class="task-overview-grid"><div class="task-overview-pill"><strong>@profile.Mood</strong><span>心情值</span></div><div class="task-overview-pill"><strong>@profile.Affinity</strong><span>亲密度</span></div><div class="task-overview-pill"><strong>@profile.Level</strong><span>等级</span></div><div class="task-overview-pill"><strong>@profile.Coins</strong><span>金币</span></div></div></section></section>
         <section class="desk-cal-shell content-card"><div class="desk-cal-toolbar"><div class="desk-cal-filters"><button type="button" class="cal-filter-btn active" data-cal-filter="pending">待处理任务</button><button type="button" class="cal-filter-btn" data-cal-filter="all">全部任务</button></div><div class="desk-cal-nav"><button type="button" class="cal-nav-arrow" data-cal-prev aria-label="上一段">‹</button><h2 class="desk-cal-title" data-cal-title></h2><button type="button" class="cal-nav-arrow" data-cal-next aria-label="下一段">›</button><button type="button" class="cal-today-btn" data-cal-today>今天</button></div><div class="desk-cal-views"><button type="button" class="cal-view-btn" data-cal-view="day">日视图</button><button type="button" class="cal-view-btn active" data-cal-view="week">周视图</button><button type="button" class="cal-view-btn" data-cal-view="month">月视图</button></div></div><div id="deskCalendarRoot" class="desk-cal-root"></div></section>
         <section class="desk-lower-grid"><section class="content-card task-manage-card"><div class="card-head"><div><span class="card-kicker">任务</span><h3>任务管理</h3></div><span class="tiny-badge">@pendingTasks.Count</span></div><div class="manage-task-list">@foreach (var task in pendingTasks.Take(6)){<article class="manage-task-item"><div class="manage-task-main"><strong>@task.Title</strong>@if (!string.IsNullOrWhiteSpace(task.Description)){<p>@task.Description</p>}<span>@(task.DueAt?.ToString("yyyy-MM-dd HH:mm") ?? "未设置截止时间")</span></div><div class="manage-task-actions"><form method="post" asp-page-handler="CompleteTask"><input type="hidden" asp-for="TaskId" value="@task.Id" /><button type="submit" class="small-action">完成</button></form><details class="task-edit-box"><summary>编辑</summary><form method="post" asp-page-handler="UpdateTask" class="task-edit-form"><input type="hidden" asp-for="TaskId" value="@task.Id" /><input asp-for="EditTaskTitle" class="soft-input" value="@task.Title" /><textarea asp-for="EditTaskDescription" class="soft-input" rows="2">@task.Description</textarea><input asp-for="EditTaskDueAt" class="soft-input" type="datetime-local" value="@task.DueAt?.ToString("yyyy-MM-ddTHH:mm")" /><button type="submit" class="small-action">保存</button></form></details><form method="post" asp-page-handler="DeleteTask" onsubmit="return confirm('确定删除这个任务吗？');"><input type="hidden" asp-for="TaskId" value="@task.Id" /><button type="submit" class="small-action danger">删除</button></form></div></article>}</div></section>
-            <section class="desk-chat-dock content-card"><div class="desk-chat-dock-head"><div><span class="desk-chat-tag">@spirit.Name</span><span class="desk-chat-meta">@spirit.Title</span></div><a class="chat-link" asp-page="/Chat">完整聊天</a></div><div class="desk-chat-stream">@if (recentMessages.Count == 0){<p class="desk-chat-placeholder">还没有对话，先和 @spirit.Name 打个招呼吧。</p>}else{@foreach (var message in recentMessages){<div class="desk-chat-line @(message.Sender == "user" ? "user" : "spirit")"><span class="desk-chat-who">@(message.Sender == "user" ? profile.Nickname : spirit.Name)</span><span class="desk-chat-msg">@message.Content</span></div>}}</div><form method="post" asp-page-handler="SendMessage" class="desk-chat-form"><textarea asp-for="MessageText" class="soft-input desk-chat-input" rows="2" placeholder="发送消息给 @spirit.Name"></textarea><button type="submit" class="action-button mint desk-chat-send">发送</button></form></section></section>
+            <section class="desk-chat-dock content-card"><div class="desk-chat-dock-head"><div><span class="desk-chat-tag">@spirit.Name</span><span class="desk-chat-meta">@spirit.Title</span></div><a class="chat-link" asp-page="/Chat">完整聊天</a></div><div class="desk-chat-stream" data-stream-chat-list data-user-name="@displayNickname" data-spirit-name="@spirit.Name">@if (recentMessages.Count == 0){<p class="desk-chat-placeholder">还没有对话，先和 @spirit.Name 打个招呼吧。</p>}else{@foreach (var message in recentMessages){<div class="desk-chat-line @(message.Sender == "user" ? "user" : "spirit")"><span class="desk-chat-who">@(message.Sender == "user" ? displayNickname : spirit.Name)</span><span class="desk-chat-msg">@message.Content</span></div>}}</div><form method="post" asp-page-handler="SendMessage" class="desk-chat-form" data-stream-chat-form data-stream-url="@Url.Page("/Index", "StreamMessage")"><textarea asp-for="MessageText" class="soft-input desk-chat-input" rows="2" placeholder="发送消息给 @spirit.Name"></textarea><button type="submit" class="action-button mint desk-chat-send">发送</button></form></section></section>
         <form method="post" asp-page="/Index" id="desk-antiforgery-source" class="desk-antiforgery-source" aria-hidden="true"><input type="hidden" name="__RequestVerificationToken" value="@afTokens.RequestToken" /></form>
     </main>
 </div>

@@ -1,4 +1,10 @@
-﻿<!DOCTYPE html>
+﻿@*
+  【文件】_Layout.cshtml — 布局母版（非独立 URL，被 _ViewStart 套用）
+  【作用】<head> 引用 ~/css/site.css；<body> 中 @RenderBody() 插入各页内容；底部 ~/js/site.js
+  【SSR】母版本身也可含 Razor；子页面（Index 等）渲染后嵌入此处
+  【静态】~/ 映射 wwwroot，见 docs/basic/08-wwwroot与静态资源详解.md
+*@
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="utf-8" />

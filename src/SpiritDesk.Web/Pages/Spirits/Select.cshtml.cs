@@ -1,4 +1,12 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿// =============================================================================
+// Select.cshtml.cs — 首次选精灵 onboarding（/Spirits/Select）
+// =============================================================================
+// 数据结构：List&lt;SpiritDefinition&gt; Spirits；[TempData] ErrorMessage 跨 POST 回显
+// C# 语法：
+//   - = []：空集合表达式（C# 12），等价 new List&lt;SpiritDefinition&gt;()
+// =============================================================================
+
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using SpiritDesk.Core.Entities;
 using SpiritDesk.Web.Services;

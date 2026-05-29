@@ -1,3 +1,15 @@
+// =============================================================================
+// Login.cshtml.cs — 登录页 PageModel
+// =============================================================================
+// 数据结构：WebAccount（EF 查库）；Claims + ClaimsIdentity（Cookie 身份）
+// C# 语法：
+//   - [AllowAnonymous]：门禁开启时仍允许未登录访问本页
+//   - AsNoTracking()：只读查询不跟踪变更，略省内存
+//   - IPasswordHasher&lt;WebAccount&gt;：VerifyHashedPassword / HashPassword
+//   - ConfigureAwait(false)：延续不一定回到请求上下文（库代码常见写法）
+//   - new(ClaimTypes.Name, displayName)：目标类型 new 表达式（C# 9+）
+// =============================================================================
+
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -12,6 +24,11 @@ using SpiritDesk.Web.Data;
 
 namespace SpiritDesk.Web.Pages;
 
+/// <summary>
+/// 登录页 /Login — PageModel（Login.cshtml）。
+/// 支持 appsettings 演示账号与数据库 WebAccount；成功则签发 Cookie。
+/// 门禁关闭时 OnGet 直接重定向首页。
+/// </summary>
 [AllowAnonymous]
 [IgnoreAntiforgeryToken]
 public class LoginModel(

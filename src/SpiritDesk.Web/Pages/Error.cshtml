@@ -1,4 +1,9 @@
-﻿@page
+﻿@*
+  【文件】Error.cshtml — 全局异常时 SSR 显示（UseExceptionHandler 跳转）
+  【URL】/Error
+  【后端】Error.cshtml.cs → 填充 RequestId 便于排查
+*@
+@page
 @model ErrorModel
 @{
     ViewData["Title"] = "Error";

@@ -1,4 +1,8 @@
-﻿@using SpiritDesk.Web
+﻿@*
+  【文件】_ViewImports.cshtml — 全局导入（每个 Pages/*.cshtml 自动生效）
+  【作用】统一 @namespace、@using、asp-* Tag Helpers，不必每页重复写
+*@
+@using SpiritDesk.Web
 @using SpiritDesk.Web.Auth
 @namespace SpiritDesk.Web.Pages
 @addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers

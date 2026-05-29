@@ -1,4 +1,10 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿// =============================================================================
+// Settings.cshtml.cs — 设置页 PageModel
+// =============================================================================
+// 数据结构：SettingsViewModel；POST handler：Rename / SelectSpirit / ResetDemoData
+// =============================================================================
+
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using SpiritDesk.Web.Models;
 using SpiritDesk.Web.Services;

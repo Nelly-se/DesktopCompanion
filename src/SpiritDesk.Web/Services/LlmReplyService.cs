@@ -1,3 +1,15 @@
+// =============================================================================
+// LlmReplyService.cs — 大模型 HTTP 客户端（OpenAI 兼容 / 火山 Ark）
+// =============================================================================
+// 数据结构：
+//   - IReadOnlyList&lt;ChatMessage&gt;?：最近对话上下文，序列化为 JSON messages 数组
+//   - 匿名对象 new { model, messages }：JsonSerializer.Serialize 的临时 DTO
+// C# 语法：
+//   - readonly 字段：构造后不变（HttpClient、配置）
+//   - ?? 合并配置项；FirstNonEmpty 选第一个非空字符串
+//   - using var response：IDisposable 自动释放 HttpResponseMessage
+// =============================================================================
+
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
@@ -6,6 +18,7 @@ using SpiritDesk.Core.Entities;
 
 namespace SpiritDesk.Web.Services;
 
+/// <summary>Chat Completions；无 Key 或失败时上层用 SpiritPersonaService 规则回复。</summary>
 public class LlmReplyService
 {
     private const string DefaultOpenAiBaseUrl = "https://api.openai.com/v1";
@@ -95,6 +108,61 @@ public class LlmReplyService
         {
             _logger.LogWarning(ex, "{Provider} request failed. Falling back to scripted reply.", _providerName);
             return scriptedReply ?? fallbackReply;
+        }
+    }
+
+    public async Task<string> GenerateReplyStreamAsync(
+        SpiritDefinition spirit,
+        string nickname,
+        string userMessage,
+        string fallbackReply,
+        IReadOnlyList<ChatMessage>? recentConversation,
+        Func<string, Task> onChunk,
+        CancellationToken cancellationToken = default)
+    {
+        var scriptedReply = BuildScriptedReply(spirit, nickname, userMessage);
+        if (string.IsNullOrWhiteSpace(_apiKey))
+        {
+            _logger.LogWarning("No LLM API key is configured for {Provider}. Falling back to scripted reply.", _providerName);
+            return await EmitFallbackReplyAsync(scriptedReply ?? fallbackReply, onChunk, cancellationToken);
+        }
+
+        var endpoint = BuildCompletionsEndpoint(_baseUrl);
+        try
+        {
+            var payloadJson = JsonSerializer.Serialize(new
+            {
+                model = _model,
+                messages = BuildMessages(spirit, nickname, userMessage, recentConversation),
+                temperature = 0.85,
+                stream = true
+            });
+
+            using var response = await SendStreamingWithRetryAsync(endpoint, payloadJson, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync(cancellationToken);
+                _logger.LogWarning(
+                    "{Provider} streaming request failed with status {StatusCode}. Response preview: {BodyPreview}",
+                    _providerName,
+                    (int)response.StatusCode,
+                    SummarizeForLog(body));
+                return await EmitFallbackReplyAsync(scriptedReply ?? fallbackReply, onChunk, cancellationToken);
+            }
+
+            var streamedReply = await ReadStreamingReplyAsync(response, onChunk, cancellationToken);
+            if (string.IsNullOrWhiteSpace(streamedReply))
+            {
+                _logger.LogWarning("{Provider} returned an empty streaming assistant message. Falling back to scripted reply.", _providerName);
+                return await EmitFallbackReplyAsync(scriptedReply ?? fallbackReply, onChunk, cancellationToken);
+            }
+
+            return streamedReply.Trim();
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "{Provider} streaming request failed. Falling back to scripted reply.", _providerName);
+            return await EmitFallbackReplyAsync(scriptedReply ?? fallbackReply, onChunk, cancellationToken);
         }
     }
 
@@ -208,6 +276,100 @@ public class LlmReplyService
         throw new HttpRequestException("LLM request failed after retry.");
     }
 
+    private async Task<HttpResponseMessage> SendStreamingWithRetryAsync(string endpoint, string payloadJson, CancellationToken cancellationToken)
+    {
+        const int maxAttempts = 2;
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
+            request.Version = HttpVersion.Version11;
+            request.VersionPolicy = HttpVersionPolicy.RequestVersionOrLower;
+            request.Headers.ConnectionClose = true;
+            request.Content = new StringContent(payloadJson, Encoding.UTF8, "application/json");
+            try
+            {
+                return await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            }
+            catch (HttpRequestException) when (attempt < maxAttempts)
+            {
+                await Task.Delay(300, cancellationToken);
+            }
+        }
+
+        throw new HttpRequestException("LLM streaming request failed after retry.");
+    }
+
+    private static async Task<string> ReadStreamingReplyAsync(
+        HttpResponseMessage response,
+        Func<string, Task> onChunk,
+        CancellationToken cancellationToken)
+    {
+        var reply = new StringBuilder();
+        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        using var reader = new StreamReader(stream, Encoding.UTF8);
+        while (!reader.EndOfStream && !cancellationToken.IsCancellationRequested)
+        {
+            var line = await reader.ReadLineAsync(cancellationToken);
+            if (string.IsNullOrWhiteSpace(line) || !line.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var data = line["data:".Length..].Trim();
+            if (data == "[DONE]")
+            {
+                break;
+            }
+
+            var chunk = ExtractStreamingContent(data);
+            if (string.IsNullOrEmpty(chunk))
+            {
+                continue;
+            }
+
+            reply.Append(chunk);
+            await onChunk(chunk);
+        }
+
+        return reply.ToString();
+    }
+
+    private static string? ExtractStreamingContent(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        if (!doc.RootElement.TryGetProperty("choices", out var choices) || choices.ValueKind != JsonValueKind.Array || choices.GetArrayLength() == 0)
+        {
+            return null;
+        }
+
+        var firstChoice = choices[0];
+        if (firstChoice.TryGetProperty("delta", out var delta) && delta.TryGetProperty("content", out var deltaContent))
+        {
+            return ReadContentElement(deltaContent);
+        }
+
+        if (firstChoice.TryGetProperty("message", out var message) && message.TryGetProperty("content", out var messageContent))
+        {
+            return ReadContentElement(messageContent);
+        }
+
+        return null;
+    }
+
+    private static async Task<string> EmitFallbackReplyAsync(string reply, Func<string, Task> onChunk, CancellationToken cancellationToken)
+    {
+        var trimmed = reply.Trim();
+        foreach (var chunk in SplitForStreaming(trimmed))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await onChunk(chunk);
+            await Task.Delay(18, cancellationToken);
+        }
+
+        return trimmed;
+    }
+
     private static string? ExtractAssistantContent(JsonElement root)
     {
         if (!root.TryGetProperty("choices", out var choices) || choices.ValueKind != JsonValueKind.Array || choices.GetArrayLength() == 0)
@@ -221,6 +383,11 @@ public class LlmReplyService
             return null;
         }
 
+        return ReadContentElement(content);
+    }
+
+    private static string? ReadContentElement(JsonElement content)
+    {
         return content.ValueKind switch
         {
             JsonValueKind.String => content.GetString(),
@@ -274,6 +441,26 @@ public class LlmReplyService
         }
 
         return singleLine[..maxLength] + "...";
+    }
+
+    private static IEnumerable<string> SplitForStreaming(string text)
+    {
+        const int maxChunkLength = 8;
+        var chunk = new StringBuilder();
+        foreach (var ch in text)
+        {
+            chunk.Append(ch);
+            if (chunk.Length >= maxChunkLength || "，。！？；,.!?;".Contains(ch))
+            {
+                yield return chunk.ToString();
+                chunk.Clear();
+            }
+        }
+
+        if (chunk.Length > 0)
+        {
+            yield return chunk.ToString();
+        }
     }
 
     private static bool ContainsAny(string input, params string[] keywords) => keywords.Any(keyword => input.Contains(keyword, StringComparison.OrdinalIgnoreCase));

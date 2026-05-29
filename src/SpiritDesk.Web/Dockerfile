@@ -1,3 +1,5 @@
+# SpiritDesk.Web 容器镜像：多阶段构建，最终运行 dotnet SpiritDesk.Web.dll
+
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 

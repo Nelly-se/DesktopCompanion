@@ -1,4 +1,5 @@
 {
+  // dotnet run / F5 调试时的启动 URL 与环境（Development 会合并 appsettings.Development.json）
   "$schema": "https://json.schemastore.org/launchsettings.json",
   "profiles": {
     "http": {

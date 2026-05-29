@@ -1,3 +1,13 @@
+// =============================================================================
+// Register.cshtml.cs — 注册页 PageModel
+// =============================================================================
+// 数据结构：new WebAccount { ... } 后 Add + SaveChangesAsync 写入 SQLite
+// C# 语法：
+//   - AnyAsync：EF 异步判断是否存在（用户名重复）
+//   - DateTimeOffset.UtcNow：带 UTC 偏移的注册时间
+//   - TempData["LoginNotice"]：重定向到 Login 后显示一次性提示
+// =============================================================================
+
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -10,6 +20,10 @@ using SpiritDesk.Web.Data;
 
 namespace SpiritDesk.Web.Pages;
 
+/// <summary>
+/// 注册页 /Register — PageModel（Register.cshtml）。
+/// 校验用户名格式、写入 PasswordHash 到 WebAccounts，成功后跳转登录。
+/// </summary>
 [AllowAnonymous]
 [IgnoreAntiforgeryToken]
 public class RegisterModel(
@@ -117,6 +131,16 @@ public class RegisterModel(
         account.PasswordHash = passwordHasher.HashPassword(account, Password);
 
         dbContext.WebAccounts.Add(account);
+        dbContext.UserProfiles.Add(new UserProfile
+        {
+            AccountUsername = normalized,
+            Nickname = displayName,
+            CurrentSpiritId = string.Empty,
+            Mood = 76,
+            Affinity = 18,
+            Level = 1,
+            Coins = 30
+        });
         await dbContext.SaveChangesAsync().ConfigureAwait(false);
 
         TempData["LoginNotice"] = $"账号「{displayName}」已创建，请登录。";

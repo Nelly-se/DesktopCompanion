@@ -1,3 +1,13 @@
+// =============================================================================
+// ShellSettingsService.cs — 读写 shell-settings.json
+// =============================================================================
+// 数据结构：ShellSettings 对象 ↔ JSON 文本（camelCase 命名）
+// C# 语法：
+//   - static readonly JsonSerializerOptions：序列化配置只创建一次
+//   - ?? new ShellSettings()：反序列化 null 时回退默认对象
+//   - Environment.SpecialFolder.ApplicationData：跨用户 AppData 路径
+// =============================================================================
+
 using System.IO;
 using System.Diagnostics;
 using System.Text.Json;

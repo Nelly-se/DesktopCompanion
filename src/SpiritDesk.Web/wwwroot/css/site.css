@@ -1,4 +1,6 @@
-﻿:root {
+﻿/* site.css — SpiritDesk 薄荷主题：布局、侧栏、卡片、登录页、悬浮精灵、任务/聊天区 */
+
+:root {
   --bg: #eef6f1;
   --panel: rgba(255, 255, 255, 0.92);
   --panel-strong: #ffffff;
@@ -1193,6 +1195,10 @@ form {
   display: grid;
   grid-template-columns: minmax(320px, 0.88fr) minmax(0, 1.12fr);
   gap: 20px;
+  align-items: stretch;
+  height: calc(100vh - 132px);
+  min-height: min(560px, calc(100vh - 132px));
+  min-width: 0;
 }
 
 .chat-live-column {
@@ -1209,8 +1215,16 @@ form {
 }
 
 .chat-live-card {
+  display: grid;
   padding: 0;
   min-height: 0;
+  overflow: hidden;
+}
+
+.chat-history-card {
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  overflow: hidden;
 }
 
 .chat-overview-grid {
@@ -1266,7 +1280,8 @@ form {
 .chat-timeline {
   display: grid;
   gap: 12px;
-  max-height: 70vh;
+  min-height: 0;
+  max-height: none;
   overflow: auto;
   padding-right: 6px;
 }
@@ -1603,10 +1618,12 @@ form {
 
 .chat-sidebar-card {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 10px;
-  min-height: calc(100vh - 44px);
-  max-height: calc(100vh - 44px);
+  height: 100%;
+  min-height: 0;
+  max-height: none;
+  overflow: hidden;
 }
 
 .chat-sidebar-head {
@@ -1682,6 +1699,7 @@ form {
   gap: 10px;
   align-content: start;
   padding: 12px 14px;
+  min-height: 0;
 }
 
 .chat-composer-input {
@@ -1696,7 +1714,8 @@ form {
     radial-gradient(circle at top right, color-mix(in srgb, var(--brand-accent) 12%, transparent), transparent 48%);
   border-radius: 20px;
   padding: 12px;
-  min-height: clamp(400px, 52vh, 680px);
+  min-height: 0;
+  scroll-padding-bottom: 16px;
 }
 
 .chat-live-message {
@@ -1786,6 +1805,12 @@ form {
     grid-template-columns: 1fr;
   }
 
+  .chat-history-grid {
+    height: auto;
+    min-height: 0;
+    align-items: start;
+  }
+
   .chat-sidebar {
     position: static;
   }
@@ -1795,12 +1820,20 @@ form {
     max-height: none;
   }
 
+  .chat-live-stream {
+    min-height: clamp(360px, 52vh, 600px);
+  }
+
   .chat-live-column {
     grid-template-rows: auto auto;
   }
 
   .chat-overview-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .chat-timeline {
+    max-height: 70vh;
   }
 }
 
@@ -2479,7 +2512,9 @@ form {
 .desk-chat-dock {
   padding: 16px;
   display: grid;
+  grid-template-rows: auto minmax(260px, 1fr) auto;
   gap: 12px;
+  min-height: min(620px, calc(100vh - 220px));
 }
 
 .desk-chat-dock-head {
@@ -2500,10 +2535,13 @@ form {
 }
 
 .desk-chat-stream {
-  max-height: 140px;
+  min-height: 0;
+  max-height: none;
   overflow-y: auto;
   display: grid;
   gap: 8px;
+  align-content: start;
+  padding-right: 6px;
 }
 
 .desk-chat-placeholder {
@@ -2525,6 +2563,29 @@ form {
 
 .desk-chat-line.spirit {
   background: color-mix(in srgb, var(--brand-accent) 6%, #f9fcfa);
+}
+
+.desk-chat-line.is-streaming .desk-chat-msg::after {
+  content: "";
+  display: inline-block;
+  width: 0.55em;
+  height: 1em;
+  margin-left: 2px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--brand-accent) 62%, #6b7a73);
+  vertical-align: -0.16em;
+  animation: streamCaret 0.9s ease-in-out infinite;
+}
+
+@keyframes streamCaret {
+  0%,
+  100% {
+    opacity: 0.28;
+  }
+
+  50% {
+    opacity: 1;
+  }
 }
 
 .desk-chat-who {

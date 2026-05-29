@@ -1,13 +1,29 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿// =============================================================================
+// SpiritDeskDbContext.cs — EF Core DbContext（对象 ↔ SQLite 表映射中心）
+// =============================================================================
+// 数据结构：
+//   - DbSet&lt;T&gt;：每张表在代码中的入口，LINQ 查询如 dbContext.Tasks.Where(...)
+//   - ModelBuilder：OnModelCreating 里配置索引、HasData 种子、DateOnly 值转换
+// C# 语法：
+//   - 主构造函数 (DbContextOptions options) : DbContext(options)：C# 12 简写构造函数
+//   - => Set&lt;T&gt;()：表达式体属性，返回泛型 DbSet
+// 生命周期：AddDbContext 注册为 Scoped，每个 HTTP 请求一个实例（与 PageModel/Service 共享）
+// =============================================================================
+
+using Microsoft.EntityFrameworkCore;
 using SpiritDesk.Core.Constants;
 using SpiritDesk.Core.Entities;
 
 namespace SpiritDesk.Web.Data;
 
+/// <summary>映射 Core 实体到 SQLite；种子五精灵；WebAccount 用户名唯一索引。</summary>
 public class SpiritDeskDbContext(DbContextOptions<SpiritDeskDbContext> options) : DbContext(options)
 {
+    /// <summary>玩家档案（昵称、当前精灵、心情等）。</summary>
     public DbSet<UserProfile> UserProfiles => Set<UserProfile>();
+    /// <summary>站点登录账号（通过规范化用户名绑定 UserProfile）。</summary>
     public DbSet<WebAccount> WebAccounts => Set<WebAccount>();
+
     public DbSet<SpiritDefinition> Spirits => Set<SpiritDefinition>();
     public DbSet<TaskItem> Tasks => Set<TaskItem>();
     public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
@@ -23,11 +39,22 @@ public class SpiritDeskDbContext(DbContextOptions<SpiritDeskDbContext> options) 
             entity.Property(x => x.PasswordHash).HasMaxLength(500).IsRequired();
         });
 
+        modelBuilder.Entity<UserProfile>(entity =>
+        {
+            entity.HasIndex(x => x.AccountUsername).IsUnique();
+            entity.Property(x => x.AccountUsername).HasMaxLength(64);
+        });
+
+        modelBuilder.Entity<TaskItem>().HasIndex(x => x.UserProfileId);
+        modelBuilder.Entity<ChatMessage>().HasIndex(x => x.UserProfileId);
+        modelBuilder.Entity<DailyActionLog>().HasIndex(x => new { x.UserProfileId, x.ActionDate, x.ActionType }).IsUnique();
+
         modelBuilder.Entity<SpiritDefinition>().HasKey(x => x.Id);
         modelBuilder.Entity<DailyActionLog>().Property(x => x.ActionDate).HasConversion(
             value => value.ToDateTime(TimeOnly.MinValue),
             value => DateOnly.FromDateTime(value));
 
+        // 五精灵静态种子数据（Id 与 SpiritIds 常量一致）
         modelBuilder.Entity<SpiritDefinition>().HasData(
             new SpiritDefinition
             {

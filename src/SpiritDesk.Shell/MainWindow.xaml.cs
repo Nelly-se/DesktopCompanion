@@ -1,4 +1,17 @@
-﻿using System.ComponentModel;
+﻿// =============================================================================
+// MainWindow.xaml.cs — WPF 主窗口代码后置（内嵌 WebView2 + 启动 Web 进程）
+// =============================================================================
+// 数据结构：
+//   - Process? _webProcess：本地 dotnet run Web 的子进程，可空（连远程时为 null）
+//   - HttpClient：浮球与 Web API 共用，Dispose 在 OnClosing
+//   - Uri baseUrl：站点根地址
+// C# 语法：
+//   - partial class MainWindow : Window：XAML 与 C# 分部类
+//   - async void OnLoaded：事件处理器允许 async（异常需自行处理）
+//   - ?. 与 ??：可空引用、空合并
+// =============================================================================
+
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Net;
@@ -142,10 +155,14 @@ public partial class MainWindow : Window
             RedirectStandardError = true
         };
 
-        // 本地桌面模式仍使用 Development，便于加载 .env / 本地配置；
-        // 但桌面壳自带的是单机本地 Web，不再要求额外登录。
+        // 本地子进程：Development 便于 .env / appsettings.Development.json。
+        // 默认 Shell 免登录（SpiritDesk__Auth__Enabled=false）；答辩演示登录注册时设环境变量 SPIRITDESK_REQUIRE_AUTH=1。
+        // 连 SPIRITDESK_REMOTE_BASEURL 云端时不走此处，门禁由远端站点配置决定。
         startInfo.Environment["ASPNETCORE_ENVIRONMENT"] = "Development";
-        startInfo.Environment["SpiritDesk__Auth__Enabled"] = "false";
+        if (!IsShellAuthRequired())
+        {
+            startInfo.Environment["SpiritDesk__Auth__Enabled"] = "false";
+        }
 
         var process = Process.Start(startInfo);
         if (process is null)
@@ -208,6 +225,16 @@ public partial class MainWindow : Window
         var port = ((IPEndPoint)listener.LocalEndpoint).Port;
         listener.Stop();
         return port;
+    }
+
+    /// <summary>
+    /// 环境变量 SPIRITDESK_REQUIRE_AUTH=1 时，本地子进程不覆盖 Auth.Enabled，沿用 Development 配置（显示登录/注册）。
+    /// </summary>
+    private static bool IsShellAuthRequired()
+    {
+        var value = Environment.GetEnvironmentVariable("SPIRITDESK_REQUIRE_AUTH");
+        return string.Equals(value, "1", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
     }
 
     private async Task<string?> BuildAuthCookieHeaderAsync(string baseUrl)

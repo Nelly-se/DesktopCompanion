@@ -1,3 +1,5 @@
+// AssemblyInfo.cs — WPF 主题资源字典查找位置（程序集级）
+
 using System.Windows;
 
 [assembly:ThemeInfo(

@@ -1,3 +1,11 @@
+// =============================================================================
+// Error.cshtml.cs — 全局异常页 PageModel
+// =============================================================================
+// C# 语法：
+//   - 表达式体属性 ShowRequestId => ...：根据 RequestId 是否为空决定显示
+//   - Activity.Current?.Id：分布式追踪 ID，?. 空则回退 HttpContext.TraceIdentifier
+// =============================================================================
+
 using System.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;

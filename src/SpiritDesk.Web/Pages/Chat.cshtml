@@ -1,3 +1,10 @@
+@*
+  【文件】Chat.cshtml — SSR 页面
+  【URL】GET /Chat；?spiritId= 切换会话
+  【后端】Chat.cshtml.cs → ChatModel
+  【界面】按精灵分组的聊天记录、发送框
+  【POST】asp-page-handler="SendMessage" → OnPostSendMessageAsync
+*@
 @page
 @model SpiritDesk.Web.Pages.ChatModel
 @inject SpiritDesk.Web.Services.SpiritPersonaService PersonaService
@@ -117,33 +124,6 @@
                             <p>@spirit.Personality</p>
                         </div>
                         <span class="tiny-badge">@spirit.Mbti</span>
-                    </div>
-
-                    <div class="chat-sidebar-summary">
-                        <div class="task-overview-grid chat-overview-grid">
-                            <div class="task-overview-pill">
-                                <strong>@Model.ChatHistory.TotalMessageCount</strong>
-                                <span>总消息数</span>
-                            </div>
-                            <div class="task-overview-pill">
-                                <strong>@Model.ChatHistory.UserMessageCount</strong>
-                                <span>@(string.IsNullOrWhiteSpace(profile.Nickname) ? "你" : profile.Nickname)</span>
-                            </div>
-                            <div class="task-overview-pill">
-                                <strong>@Model.ChatHistory.SpiritMessageCount</strong>
-                                <span>@spirit.Name</span>
-                            </div>
-                            <div class="task-overview-pill">
-                                <strong>@Model.ChatHistory.ActiveThreadCount</strong>
-                                <span>已聊天精灵</span>
-                            </div>
-                        </div>
-
-                        <div class="chat-persona-note">
-                            <strong>@spirit.Name 的聊天风格</strong>
-                            <p>@spirit.Description</p>
-                            <span>@spirit.SpecialMechanism</span>
-                        </div>
                     </div>
 
                     <div class="chat-sidebar-body chat-live-stream" id="chatLiveStream">

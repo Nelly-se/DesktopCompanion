@@ -1,4 +1,9 @@
-﻿@using SpiritDesk.Web.Helpers
+﻿@*
+  【文件】_FloatingCompanion.cshtml — 局部视图 Partial（无独立 URL）
+  【作用】浏览器页面右下角悬浮按钮/面板；链接到 Index、Chat 等
+  【区别】桌面贴在屏幕上的浮球是 SpiritDesk.Shell 的 WPF 窗口，不是本文件
+*@
+@using SpiritDesk.Web.Helpers
 @{
     var companionName = ViewData["FloatingCompanionName"] as string;
     var companionImage = ViewData["FloatingCompanionImage"] as string;

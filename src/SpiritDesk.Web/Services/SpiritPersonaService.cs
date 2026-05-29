@@ -1,8 +1,18 @@
-﻿using SpiritDesk.Core.Constants;
+﻿// =============================================================================
+// SpiritPersonaService.cs — 五精灵人设文案（无数据库，纯字符串逻辑）
+// =============================================================================
+// 数据结构：输入 SpiritDefinition + string，输出 string；switch 按 SpiritIds 分支
+// C# 语法：
+//   - $""" ... """：原始字符串插值多行文本（LLM system prompt）
+//   - switch 表达式：spirit.Id switch { SpiritIds.Light => "...", _ => "默认" }
+// =============================================================================
+
+using SpiritDesk.Core.Constants;
 using SpiritDesk.Core.Entities;
 
 namespace SpiritDesk.Web.Services;
 
+/// <summary>问候/规则回复/LLM prompt；LLM 失败时 SpiritDeskService 回退本类。</summary>
 public class SpiritPersonaService
 {
     public string BuildLlmSystemPrompt(SpiritDefinition spirit, string nickname)

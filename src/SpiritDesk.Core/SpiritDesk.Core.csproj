@@ -1,4 +1,5 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+﻿<!-- SpiritDesk.Core.csproj — 共享类库：实体、常量；被 Web 与 Shell 引用，不含 UI 与数据库访问 -->
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>

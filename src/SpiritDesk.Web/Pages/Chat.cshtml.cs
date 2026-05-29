@@ -1,4 +1,13 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿// =============================================================================
+// Chat.cshtml.cs — 聊天页 PageModel
+// =============================================================================
+// 数据结构：ChatHistoryViewModel（含按精灵过滤的 CurrentConversationMessages）
+// C# 语法：
+//   - [BindProperty(SupportsGet = true)]：GET ?spiritId= 也绑定到 SpiritId
+//   - RedirectToPage(new { spiritId = SpiritId })：路由匿名对象传参
+// =============================================================================
+
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using SpiritDesk.Web.Models;
 using SpiritDesk.Web.Services;

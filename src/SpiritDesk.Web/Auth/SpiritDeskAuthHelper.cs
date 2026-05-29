@@ -1,16 +1,28 @@
+// =============================================================================
+// SpiritDeskAuthHelper.cs — 从 IConfiguration 读取 SpiritDesk:Auth 配置
+// =============================================================================
+// 数据结构：无自定义类；读 appsettings.json 节 SpiritDesk:Auth
+// C# 语法：
+//   - static class：纯函数式配置读取
+//   - out 参数：TryGetBootstrapCredentials 用 out string 返回多个值（元组替代前的常见写法）
+//   - ?. 空条件：配置缺失时不抛 NullReferenceException
+//   - GetValue&lt;bool&gt; / GetValue("AllowRegistration", true)：泛型与默认值重载
+// =============================================================================
+
 using Microsoft.Extensions.Configuration;
 
 namespace SpiritDesk.Web.Auth;
 
+/// <summary>认证开关与演示账号配置，不操作 Cookie 或数据库。</summary>
 public static class SpiritDeskAuthHelper
 {
-    /// <summary>是否启用 Cookie 登录门禁（与「演示账号」无关，开启后须登录或注册）。</summary>
+    /// <summary>是否启用 Cookie 登录门禁。</summary>
     public static bool IsDemoAuthEnabled(IConfiguration configuration)
     {
         return configuration.GetSection("SpiritDesk:Auth").GetValue<bool>("Enabled");
     }
 
-    /// <summary>可选：配置中的备用账号（例如演示），与数据库注册账号可同时存在。</summary>
+    /// <summary>从配置读取可选演示账号；成功时 out 参数带出用户名与密码。</summary>
     public static bool TryGetBootstrapCredentials(
         IConfiguration configuration,
         out string username,
